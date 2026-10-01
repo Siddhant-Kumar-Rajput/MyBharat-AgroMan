@@ -75,7 +75,7 @@ Until the predictive features and source pipelines are operational, describe the
 - Agmarknet/data.gov.in market-price nudge after a reliable dataset and freshness policy are confirmed.
 - Live camera conversation remains a stretch feature after the records and evidence flows are stable.
 
-The new Phase 2 D1 environment currently lacks the reviewed district context and boundary rows from Phase 1. Importing reviewed, non-secret source data into the new database is required before the live regional/map experience is considered restored.
+The reviewed Phase 1 snapshot is now imported into the Phase 2 D1 environment: six district context rows and six boundaries dated 15 September 2026. The exact SQL is preserved at `scripts/generated/context-2026-09-15.sql`; modeled soil remains regional context rather than a farm measurement, and GAUL 2015 geometry remains a documented replacement target.
 
 ## New Phase 2 extensions agreed during planning
 

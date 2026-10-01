@@ -7,6 +7,7 @@ MyBharat AgroMan is an isolated Phase 2 staging environment extended from the fr
 - Firebase Hosting: `https://mybharat-agroman.web.app`.
 - Cloudflare Worker: `https://mybharat-agroman-api.agroman.workers.dev`.
 - APAC D1 database `mybharat-agroman` created with Phase 1 foundation and Phase 2 record migrations.
+- Six reviewed district context rows and six boundaries dated 15 September 2026 are imported from the Phase 1 Earth Engine snapshot. A live browser check verifies the observation date, source label and Ludhiana boundary. The preserved SQL has SHA-256 `857ED0E54D12F869C1CA7248D1ECD40F8858831BD20F97A90E57279E0CAF55EA`.
 - Firebase Anonymous Authentication creates a guest session successfully.
 - The new visitor landing cleanly separates guest access from farmer sign-in; Google and phone entry interfaces are present.
 - Phone Authentication is enabled with a configured fictional test number. The gated Chromium smoke test completes the OTP flow, receives a real Firebase token and reaches the live Worker-backed profile state.
@@ -25,7 +26,7 @@ MyBharat AgroMan is an isolated Phase 2 staging environment extended from the fr
 
 - The in-app browser still reports `auth/network-request-failed` after its reCAPTCHA interaction; the same fictional OTP flow passes in standard Chromium using Firebase's test-only local verification bypass. Production reCAPTCHA remains enabled.
 - Google sign-in and linking are implemented, but account selection has not been exercised because no Google account was authorized for testing.
-- The new Phase 2 D1 database does not yet contain the reviewed regional context and district-boundary rows from the Phase 1 environment; live pages therefore omit unavailable regional values rather than presenting synthetic replacements.
+- The imported snapshot still uses FAO GAUL 2015 geometry and must be replaced with a reviewed current boundary source before long-term operation.
 - The approved reviewer UID is allowlisted, but its account has not been authenticated in a test session, so successful reviewer access remains unverified.
 - Crop-health cases in the farmer records interface remain labelled synthetic examples; there is no live qualified remedy approval claim.
 
@@ -35,8 +36,7 @@ Follow `docs/PHASE2_PLAN.md` P0:
 
 1. Exercise Google sign-in with a user-authorized test account while retaining phone verification as the persistence gate.
 2. Authenticate the approved reviewer account and verify successful reviewer-queue access.
-3. Import separately reviewed regional context and boundaries into the new D1 database.
-4. Continue the P1 onboarding, structured crop-history and constraint-aware advisory work in `docs/PHASE2_PLAN.md`.
+3. Continue the P1 onboarding, structured crop-history and constraint-aware advisory work in `docs/PHASE2_PLAN.md`.
 
 ## Existing foundation retained from Phase 1
 

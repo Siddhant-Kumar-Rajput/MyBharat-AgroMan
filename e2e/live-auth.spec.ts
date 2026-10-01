@@ -35,6 +35,12 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
   await expect(page.getByRole("alert")).toHaveCount(0);
 
   await page.reload();
+  await page.getByRole("button", { name: "Farm advisor", exact: true }).click();
+  await expect(page.getByText("Observation date: 2026-09-15")).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText(/OpenLandMap modeled surface pH/)).toBeVisible();
+  await page.getByRole("button", { name: "Community watch", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Geographic district view for Ludhiana" })).toBeVisible();
+  await expect(page.locator("path.district-boundary")).toBeVisible();
   await page.getByRole("button", { name: "Farm records", exact: true }).click();
   await expect(page.getByRole("button", { name: "Return to entry and switch account" })).toHaveText("Verified farmer");
   await removeLiveRecord(page);

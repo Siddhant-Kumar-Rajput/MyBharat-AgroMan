@@ -22,7 +22,7 @@ Only account/security decisions require the project owner:
 
 1. Repair the phone reCAPTCHA lifecycle and complete the fictional-number OTP test.
 2. Add and test the Google provider-linking interface.
-3. Import separately reviewed regional context/boundary records into the new D1 database.
+3. Refresh the reviewed regional context/boundary snapshot when approved. The currently imported six-district snapshot is preserved at `scripts/generated/context-2026-09-15.sql` with SHA-256 `857ED0E54D12F869C1CA7248D1ECD40F8858831BD20F97A90E57279E0CAF55EA`.
 4. Approve and configure Firebase App Check after reviewing staging behavior.
 5. Approve expanded districts, refreshed observations and agronomic release evidence.
 
