@@ -8,6 +8,8 @@ import {
   languages,
   confidenceBand,
   cropCycleInputSchema,
+  cycleEventInputSchema,
+  profileInputSchema,
   matchCases,
   summarizeLedger,
   type CropHealthCase,
@@ -171,6 +173,43 @@ describe("phase two farm records", () => {
     expect(cropCycleInputSchema.safeParse(value).success).toBe(true);
     expect(cropCycleInputSchema.safeParse({ ...value, cropCode: "MANGO" }).success).toBe(false);
     expect(cropCycleInputSchema.safeParse({ ...value, startedOn: "tomorrow" }).success).toBe(false);
+  });
+
+  it("accepts optional recent crop context in the farmer profile", () => {
+    const profile = {
+      displayName: "",
+      locale: "en",
+      state: "Punjab",
+      district: "Ludhiana",
+      recentCropCode: "WHEAT",
+      lastHarvestOn: "2026-04-15",
+      consentVersion: "2026-10-01",
+    };
+    expect(profileInputSchema.safeParse(profile).success).toBe(true);
+    expect(profileInputSchema.safeParse({ ...profile, recentCropCode: "MANGO" }).success).toBe(false);
+    expect(profileInputSchema.safeParse({ ...profile, lastHarvestOn: "2999-01-01" }).success).toBe(false);
+  });
+
+  it("requires structured details for input and harvest events", () => {
+    const base = {
+      cycleId: crypto.randomUUID(),
+      occurredOn: "2026-10-01",
+      title: "Farmer record",
+      detail: "",
+      source: "farmer" as const,
+    };
+    expect(cycleEventInputSchema.safeParse({
+      ...base,
+      type: "input",
+      inputClass: "fertilizer",
+      productName: "Farmer-entered material",
+      amount: 25,
+      unit: "kg",
+      purpose: "Farmer-entered purpose",
+    }).success).toBe(true);
+    expect(cycleEventInputSchema.safeParse({ ...base, type: "input" }).success).toBe(false);
+    expect(cycleEventInputSchema.safeParse({ ...base, type: "harvest", yieldAmount: 12, yieldUnit: "quintal" }).success).toBe(true);
+    expect(cycleEventInputSchema.safeParse({ ...base, type: "harvest" }).success).toBe(false);
   });
 
   it("retrieves only sufficiently similar closed cases", () => {

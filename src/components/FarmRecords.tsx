@@ -6,9 +6,11 @@ import {
   Download,
   FileText,
   MapPin,
+  PackageOpen,
   Phone,
   Plus,
   Printer,
+  Scale,
   ShieldCheck,
   Sprout,
 } from "lucide-react";
@@ -61,6 +63,26 @@ const reasonKey: Record<string, keyof Copy> = {
   "same district": "sameDistrict",
   "nearby coarse area": "nearbyCoarseArea",
 };
+const inputClassKey: Record<string, keyof Copy> = {
+  seed: "seed",
+  fertilizer: "fertilizer",
+  crop_protection: "pesticide",
+  soil_amendment: "soilAmendment",
+  bio_input: "bioInput",
+  other: "other",
+};
+const unitKey: Record<string, keyof Copy> = {
+  kg: "unitKg",
+  quintal: "unitQuintal",
+  tonne: "unitTonne",
+  litre: "unitLitre",
+  millilitre: "unitMillilitre",
+  gram: "unitGram",
+  bag: "unitBag",
+  acre: "acre",
+  hectare: "hectare",
+  other: "other",
+};
 
 function download(name: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -83,16 +105,21 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
   const [recordNotice, setRecordNotice] = useState("");
   const recaptcha = useRef<HTMLDivElement>(null);
   const [activeCycleId, setActiveCycleId] = useState("");
-  const [profile, setProfile] = useState({ displayName: "", state: "", district: "" });
+  const [profile, setProfile] = useState({ displayName: "", state: "", district: "", recentCropCode: "", lastHarvestOn: "" });
   const [plot, setPlot] = useState({ name: "", area: "", areaUnit: "acre", irrigation: "rainfed", mechanization: "manual" });
   const [cycle, setCycle] = useState<{ plotId: string; cropCode: CropCycleInput["cropCode"]; variety: string; startedOn: string; expectedHarvestOn: string }>({ plotId: "", cropCode: "RICE", variety: "", startedOn: today(), expectedHarvestOn: "" });
   const [activity, setActivity] = useState({ title: "", detail: "", occurredOn: today() });
+  const [farmInput, setFarmInput] = useState({ inputClass: "seed", productName: "", amount: "", unit: "kg", purpose: "", occurredOn: today(), detail: "" });
+  const [harvestRecord, setHarvestRecord] = useState({ yieldAmount: "", yieldUnit: "quintal", occurredOn: today(), detail: "" });
   const [ledger, setLedger] = useState({ kind: "expense", category: "seed", amount: "", occurredOn: today(), note: "" });
 
   const verified = demo || Boolean(user?.phoneNumber);
   const activeCycle = state.cycles.find((item) => item.id === activeCycleId) ?? state.cycles[0];
   const activeLedger = state.ledger.filter((entry) => entry.cycleId === activeCycle?.id);
   const totals = summarizeLedger(activeLedger);
+  const harvestIntervalDays = state.profile?.lastHarvestOn
+    ? Math.max(0, Math.floor((Date.now() - new Date(`${state.profile.lastHarvestOn}T00:00:00`).getTime()) / 86400000))
+    : undefined;
   const activeCase = state.cases.find((item) => item.cycleId === activeCycle?.id);
   const referenceCases = useMemo(() => {
     if (!activeCase) return [];
@@ -117,6 +144,8 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
       displayName: value.profile?.displayName ?? "",
       state: value.profile?.state ?? "",
       district: value.profile?.district ?? "",
+      recentCropCode: value.profile?.recentCropCode ?? "",
+      lastHarvestOn: value.profile?.lastHarvestOn ?? "",
     });
     setActiveCycleId((current) => current || value.cycles[0]?.id || "");
     setLoaded(true);
@@ -181,6 +210,8 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
         locale,
         state: profile.state,
         district: profile.district,
+        recentCropCode: profile.recentCropCode as ProfileInput["recentCropCode"],
+        lastHarvestOn: profile.lastHarvestOn,
         consentVersion: PHASE2_CONSENT_VERSION,
       } satisfies ProfileInput;
       if (demo) {
@@ -198,7 +229,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
       if (demo) await persistDemoPhase2(emptyState);
       else await deletePhase2Record();
       setState(emptyState);
-      setProfile({ displayName: "", state: "", district: "" });
+      setProfile({ displayName: "", state: "", district: "", recentCropCode: "", lastHarvestOn: "" });
       setActiveCycleId("");
       setDeleteArmed(false);
       setRecordNotice(t.recordDeleted);
@@ -251,10 +282,55 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
     event.preventDefault();
     if (!activeCycle) return;
     void action(async () => {
-      const value = { cycleId: activeCycle.id, type: "note" as const, ...activity, source: "farmer" as const };
+      const value = { cycleId: activeCycle.id, type: "note" as const, ...activity, source: "farmer" as const, productName: "", purpose: "" };
       if (demo) await commit({ ...state, events: [{ ...value, id: crypto.randomUUID(), createdAt: Date.now() }, ...state.events] });
       else { await phase2Post("events", value); await refresh(); }
       setActivity({ ...activity, title: "", detail: "" });
+    });
+  }
+
+  function addFarmInput(event: FormEvent) {
+    event.preventDefault();
+    if (!activeCycle) return;
+    void action(async () => {
+      const value = {
+        cycleId: activeCycle.id,
+        type: "input" as const,
+        occurredOn: farmInput.occurredOn,
+        title: farmInput.productName,
+        detail: farmInput.detail,
+        source: "farmer" as const,
+        inputClass: farmInput.inputClass as "seed" | "fertilizer" | "crop_protection" | "soil_amendment" | "bio_input" | "other",
+        productName: farmInput.productName,
+        amount: Number(farmInput.amount),
+        unit: farmInput.unit as "kg" | "quintal" | "tonne" | "litre" | "millilitre" | "gram" | "bag" | "acre" | "hectare" | "other",
+        purpose: farmInput.purpose,
+      };
+      if (demo) await commit({ ...state, events: [{ ...value, id: crypto.randomUUID(), createdAt: Date.now() }, ...state.events] });
+      else { await phase2Post("events", value); await refresh(); }
+      setFarmInput({ ...farmInput, productName: "", amount: "", purpose: "", detail: "" });
+    });
+  }
+
+  function addHarvestRecord(event: FormEvent) {
+    event.preventDefault();
+    if (!activeCycle) return;
+    void action(async () => {
+      const value = {
+        cycleId: activeCycle.id,
+        type: "harvest" as const,
+        occurredOn: harvestRecord.occurredOn,
+        title: t.harvestRecorded,
+        detail: harvestRecord.detail,
+        source: "farmer" as const,
+        productName: "",
+        purpose: "",
+        yieldAmount: Number(harvestRecord.yieldAmount),
+        yieldUnit: harvestRecord.yieldUnit as "kg" | "quintal" | "tonne" | "litre" | "millilitre" | "gram" | "bag" | "acre" | "hectare" | "other",
+      };
+      if (demo) await commit({ ...state, events: [{ ...value, id: crypto.randomUUID(), createdAt: Date.now() }, ...state.events] });
+      else { await phase2Post("events", value); await refresh(); }
+      setHarvestRecord({ ...harvestRecord, yieldAmount: "", detail: "" });
     });
   }
 
@@ -348,6 +424,8 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
         <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
         <label>{t.state}<input value={profile.state} onChange={(event) => setProfile({ ...profile, state: event.target.value })} required /></label>
         <label>{t.district}<input value={profile.district} onChange={(event) => setProfile({ ...profile, district: event.target.value })} required /></label>
+        <label>{t.recentCrop}<select value={profile.recentCropCode} onChange={(event) => setProfile({ ...profile, recentCropCode: event.target.value })}><option value="">{t.notProvided}</option>{priorityCrops.map(([cropCode]) => <option key={cropCode} value={cropCode}>{t[cropKey[cropCode]]}</option>)}</select></label>
+        <label>{t.lastHarvestDate}<input type="date" max={today()} value={profile.lastHarvestOn} onChange={(event) => setProfile({ ...profile, lastHarvestOn: event.target.value })} /></label>
         <button className="primary" disabled={busy}>{t.saveProfile}</button>
       </form>
     </section>
@@ -357,7 +435,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
     <section className="records-page section">
       <div className="records-heading">
         <div><p className="eyebrow">{t.records}</p><h1>{t.recordsTitle}</h1><p>{t.recordsCopy}</p></div>
-        <div className="identity-card"><ShieldCheck size={18} /><span>{state.profile.displayName || t.testIdentity}<small>{state.profile.district}, {state.profile.state}</small></span></div>
+        <div className="identity-card"><ShieldCheck size={18} /><span>{state.profile.displayName || t.testIdentity}<small>{state.profile.district}, {state.profile.state}</small>{state.profile.recentCropCode && <small>{t.recentCrop}: {t[cropKey[state.profile.recentCropCode]]}</small>}{harvestIntervalDays !== undefined && <small>{harvestIntervalDays} {t.daysSinceHarvest}</small>}</span></div>
       </div>
       {demo && <div className="demo-banner"><ShieldCheck size={17} />{t.syntheticCase}</div>}
 
@@ -396,7 +474,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
             <label className="wide">{t.eventDetail}<textarea value={activity.detail} onChange={(event) => setActivity({ ...activity, detail: event.target.value })} /></label>
             <button className="secondary" disabled={busy || !activeCycle}>{t.saveActivity}</button>
           </form>
-          <div className="timeline">{state.events.filter((item) => item.cycleId === activeCycle?.id).map((item) => <div key={item.id}><span /><div><strong>{item.title}</strong><small>{item.occurredOn} · {t.selfReported}</small><p>{item.detail}</p></div></div>)}</div>
+          <div className="timeline">{state.events.filter((item) => item.cycleId === activeCycle?.id).map((item) => <div key={item.id}><span /><div><strong>{item.title}</strong><small>{item.occurredOn} · {t.selfReported}</small>{item.type === "input" && item.amount !== undefined && item.unit && <p>{t.recordedQuantity}: {item.amount} {t[unitKey[item.unit]]} · {item.purpose}</p>}{item.type === "harvest" && item.yieldAmount !== undefined && item.yieldUnit && <p>{t.recordedYield}: {item.yieldAmount} {t[unitKey[item.yieldUnit]]}</p>}{item.detail && <p>{item.detail}</p>}</div></div>)}</div>
         </article>
 
         <article className="record-panel finance-panel">
@@ -409,6 +487,31 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
             <label>{t.eventDate}<input type="date" value={ledger.occurredOn} onChange={(event) => setLedger({ ...ledger, occurredOn: event.target.value })} required /></label>
             <button className="secondary" disabled={busy || !activeCycle}>{t.saveEntry}</button>
           </form>
+        </article>
+
+        <article className="record-panel structured-panel">
+          <div className="panel-title"><PackageOpen /><div><h2>{t.structuredRecords}</h2><p>{t.structuredRecordsCopy}</p></div></div>
+          <div className="structured-records">
+            <form className="record-form" onSubmit={addFarmInput}>
+              <div className="subform-heading"><PackageOpen /><div><strong>{t.recordFarmInput}</strong><small>{t.farmerReportedHistory}</small></div></div>
+              <label>{t.inputClass}<select value={farmInput.inputClass} onChange={(event) => setFarmInput({ ...farmInput, inputClass: event.target.value })}>{Object.keys(inputClassKey).map((value) => <option key={value} value={value}>{t[inputClassKey[value]]}</option>)}</select></label>
+              <label>{t.productName}<input value={farmInput.productName} onChange={(event) => setFarmInput({ ...farmInput, productName: event.target.value })} required /></label>
+              <label>{t.recordedQuantity}<input type="number" min="0.001" step="any" value={farmInput.amount} onChange={(event) => setFarmInput({ ...farmInput, amount: event.target.value })} required /></label>
+              <label>{t.unit}<select value={farmInput.unit} onChange={(event) => setFarmInput({ ...farmInput, unit: event.target.value })}>{Object.keys(unitKey).map((value) => <option key={value} value={value}>{t[unitKey[value]]}</option>)}</select></label>
+              <label>{t.purpose}<input value={farmInput.purpose} onChange={(event) => setFarmInput({ ...farmInput, purpose: event.target.value })} required /></label>
+              <label>{t.eventDate}<input type="date" value={farmInput.occurredOn} onChange={(event) => setFarmInput({ ...farmInput, occurredOn: event.target.value })} required /></label>
+              <label className="wide">{t.eventDetail}<textarea value={farmInput.detail} onChange={(event) => setFarmInput({ ...farmInput, detail: event.target.value })} /></label>
+              <button className="secondary" disabled={busy || !activeCycle}>{t.saveFarmInput}</button>
+            </form>
+            <form className="record-form" onSubmit={addHarvestRecord}>
+              <div className="subform-heading"><Scale /><div><strong>{t.recordHarvest}</strong><small>{t.farmerReportedHistory}</small></div></div>
+              <label>{t.recordedYield}<input type="number" min="0" step="any" value={harvestRecord.yieldAmount} onChange={(event) => setHarvestRecord({ ...harvestRecord, yieldAmount: event.target.value })} required /></label>
+              <label>{t.unit}<select value={harvestRecord.yieldUnit} onChange={(event) => setHarvestRecord({ ...harvestRecord, yieldUnit: event.target.value })}>{["kg", "quintal", "tonne", "bag", "other"].map((value) => <option key={value} value={value}>{t[unitKey[value]]}</option>)}</select></label>
+              <label>{t.harvestDate}<input type="date" value={harvestRecord.occurredOn} onChange={(event) => setHarvestRecord({ ...harvestRecord, occurredOn: event.target.value })} required /></label>
+              <label className="wide">{t.eventDetail}<textarea value={harvestRecord.detail} onChange={(event) => setHarvestRecord({ ...harvestRecord, detail: event.target.value })} /></label>
+              <button className="secondary" disabled={busy || !activeCycle}>{t.saveHarvest}</button>
+            </form>
+          </div>
         </article>
 
         <article className="record-panel case-panel">

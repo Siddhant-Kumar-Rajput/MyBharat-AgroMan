@@ -161,6 +161,19 @@ export const profileInputSchema = z.object({
   locale: z.string().refine((value) => languages.some(([code]) => code === value)),
   state: z.string().trim().min(2).max(100),
   district: z.string().trim().min(2).max(120),
+  recentCropCode: z
+    .enum(priorityCrops.map(([code]) => code) as [
+      (typeof priorityCrops)[number][0],
+      ...(typeof priorityCrops)[number][0][],
+    ])
+    .optional()
+    .or(z.literal("")),
+  lastHarvestOn: z
+    .string()
+    .date()
+    .refine((value) => value <= new Date().toISOString().slice(0, 10), "Harvest date cannot be in the future.")
+    .optional()
+    .or(z.literal("")),
   consentVersion: z.literal(PHASE2_CONSENT_VERSION),
 });
 export type ProfileInput = z.infer<typeof profileInputSchema>;
@@ -204,14 +217,38 @@ export type CropCycle = CropCycleInput & {
   updatedAt: number;
 };
 
-export const cycleEventInputSchema = z.object({
-  cycleId: z.string().uuid(),
-  type: z.enum(["sowing", "irrigation", "input", "assessment", "advice", "harvest", "note"]),
-  occurredOn: z.string().date(),
-  title: z.string().trim().min(1).max(120),
-  detail: z.string().trim().max(1000).optional().default(""),
-  source: z.enum(["farmer", "ai", "expert", "system"]).default("farmer"),
-});
+export const farmInputClasses = ["seed", "fertilizer", "crop_protection", "soil_amendment", "bio_input", "other"] as const;
+export const farmRecordUnits = ["kg", "quintal", "tonne", "litre", "millilitre", "gram", "bag", "acre", "hectare", "other"] as const;
+
+export const cycleEventInputSchema = z
+  .object({
+    cycleId: z.string().uuid(),
+    type: z.enum(["sowing", "irrigation", "input", "assessment", "advice", "harvest", "note"]),
+    occurredOn: z.string().date(),
+    title: z.string().trim().min(1).max(120),
+    detail: z.string().trim().max(1000).optional().default(""),
+    source: z.enum(["farmer", "ai", "expert", "system"]).default("farmer"),
+    inputClass: z.enum(farmInputClasses).optional(),
+    productName: z.string().trim().max(160).optional().default(""),
+    amount: z.number().positive().max(1000000000).optional(),
+    unit: z.enum(farmRecordUnits).optional(),
+    purpose: z.string().trim().max(300).optional().default(""),
+    yieldAmount: z.number().nonnegative().max(1000000000).optional(),
+    yieldUnit: z.enum(farmRecordUnits).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.type === "input") {
+      if (!value.inputClass) context.addIssue({ code: z.ZodIssueCode.custom, path: ["inputClass"], message: "Input class is required." });
+      if (!value.productName) context.addIssue({ code: z.ZodIssueCode.custom, path: ["productName"], message: "Product name is required." });
+      if (value.amount === undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["amount"], message: "Amount is required." });
+      if (!value.unit) context.addIssue({ code: z.ZodIssueCode.custom, path: ["unit"], message: "Unit is required." });
+      if (!value.purpose) context.addIssue({ code: z.ZodIssueCode.custom, path: ["purpose"], message: "Purpose is required." });
+    }
+    if (value.type === "harvest") {
+      if (value.yieldAmount === undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["yieldAmount"], message: "Yield amount is required." });
+      if (!value.yieldUnit) context.addIssue({ code: z.ZodIssueCode.custom, path: ["yieldUnit"], message: "Yield unit is required." });
+    }
+  });
 export type CycleEventInput = z.infer<typeof cycleEventInputSchema>;
 export type CropEvent = CycleEventInput & { id: string; createdAt: number };
 

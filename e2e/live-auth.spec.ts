@@ -50,6 +50,8 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
     await page.getByLabel("Farmer name (optional)").fill("Automated verification");
     await page.getByLabel("State").fill("Odisha");
     await page.getByLabel("District").fill("Cuttack");
+    await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
+    await page.getByLabel("Most recent harvest date (optional)").fill("2026-05-20");
     const profileResponse = page.waitForResponse(
       (response) => response.url().endsWith("/v1/profile") && response.request().method() === "POST",
     );
@@ -66,11 +68,23 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
     await startCycle.click();
     await expect(page.getByText("Active crop cycle: Rice")).toBeVisible({ timeout: 20000 });
 
+    await page.getByLabel("Farmer-entered product or material name").fill("Verification compost");
+    await page.getByLabel("Recorded quantity").fill("20");
+    await page.getByLabel("Farmer-entered purpose").fill("Automated persistence check");
+    await page.getByRole("button", { name: "Save input record" }).click();
+    await expect(page.getByText("Verification compost")).toBeVisible({ timeout: 20000 });
+
+    await page.getByLabel("Recorded yield").fill("10");
+    await page.getByRole("button", { name: "Save harvest record" }).click();
+    await expect(page.getByText(/Recorded yield: 10 Quintal/)).toBeVisible({ timeout: 20000 });
+
     await page.reload();
     await page.getByRole("button", { name: "Farm records", exact: true }).click();
     await expect(page.getByText("Automated verification")).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole("button", { name: /Verification plot/ })).toBeVisible();
     await expect(page.getByText("Active crop cycle: Rice")).toBeVisible();
+    await expect(page.getByText("Verification compost")).toBeVisible();
+    await expect(page.getByText(/Recorded yield: 10 Quintal/)).toBeVisible();
 
     await page.getByRole("button", { name: "Expert review" }).click();
     await expect(page.getByRole("heading", { name: "Review crop-health cases." })).toBeVisible();

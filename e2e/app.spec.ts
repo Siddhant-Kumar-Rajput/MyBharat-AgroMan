@@ -159,6 +159,8 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: /Continue with phone/ }).click();
   await page.getByLabel("State").fill("Odisha");
   await page.getByLabel("District").fill("Cuttack");
+  await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
+  await page.getByLabel("Most recent harvest date (optional)").fill("2026-05-20");
   await page.getByRole("button", { name: "Save profile" }).click();
 
   await page.getByLabel("Plot name").fill("North field");
@@ -171,6 +173,17 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByLabel("Activity title").fill("First irrigation");
   await page.getByRole("button", { name: "Save activity" }).click();
   await expect(page.getByText("First irrigation")).toBeVisible();
+
+  await page.getByLabel("Farmer-entered product or material name").fill("Recorded compost");
+  await page.getByLabel("Recorded quantity").fill("25");
+  await page.getByLabel("Farmer-entered purpose").fill("Soil preparation record");
+  await page.getByRole("button", { name: "Save input record" }).click();
+  await expect(page.getByText("Recorded compost")).toBeVisible();
+  await expect(page.getByText(/25 Kilogram/)).toBeVisible();
+
+  await page.getByLabel("Recorded yield").fill("18");
+  await page.getByRole("button", { name: "Save harvest record" }).click();
+  await expect(page.getByText(/Recorded yield: 18 Quintal/)).toBeVisible();
 
   await page.getByLabel("Amount in rupees").fill("1250.50");
   await page.getByRole("button", { name: "Save entry" }).click();

@@ -594,7 +594,7 @@ async function route(request: Request, env: Env) {
 
   if (path === "profile" && request.method === "GET") {
     const row = await env.DB.prepare(
-      `SELECT display_name, locale, state, district, consent_version, created_at, updated_at
+      `SELECT display_name, locale, state, district, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at
        FROM farmer_profiles WHERE subject_id = ?`,
     )
       .bind(subject)
@@ -606,6 +606,8 @@ async function route(request: Request, env: Env) {
             locale: row.locale,
             state: row.state,
             district: row.district,
+            recentCropCode: row.recent_crop_code || "",
+            lastHarvestOn: row.last_harvest_on || "",
             consentVersion: row.consent_version,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
@@ -619,13 +621,15 @@ async function route(request: Request, env: Env) {
     const now = Date.now();
     await env.DB.prepare(
       `INSERT INTO farmer_profiles
-       (subject_id, display_name, locale, state, district, consent_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       (subject_id, display_name, locale, state, district, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(subject_id) DO UPDATE SET
          display_name = excluded.display_name,
          locale = excluded.locale,
          state = excluded.state,
          district = excluded.district,
+         recent_crop_code = excluded.recent_crop_code,
+         last_harvest_on = excluded.last_harvest_on,
          consent_version = excluded.consent_version,
          updated_at = excluded.updated_at`,
     )
@@ -635,6 +639,8 @@ async function route(request: Request, env: Env) {
         input.locale,
         input.state,
         input.district,
+        input.recentCropCode || null,
+        input.lastHarvestOn || null,
         input.consentVersion,
         now,
         now,
@@ -722,10 +728,27 @@ async function route(request: Request, env: Env) {
     const id = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO crop_events
-       (id, subject_id, cycle_id, event_type, occurred_on, title, detail, source, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, subject_id, cycle_id, event_type, occurred_on, title, detail, source, input_class, product_name, amount, unit, purpose, yield_amount, yield_unit, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, subject, input.cycleId, input.type, input.occurredOn, input.title, input.detail, input.source, Date.now())
+      .bind(
+        id,
+        subject,
+        input.cycleId,
+        input.type,
+        input.occurredOn,
+        input.title,
+        input.detail,
+        input.source,
+        input.inputClass || null,
+        input.productName,
+        input.amount ?? null,
+        input.unit || null,
+        input.purpose,
+        input.yieldAmount ?? null,
+        input.yieldUnit || null,
+        Date.now(),
+      )
       .run();
     return json(request, env, { id }, 201);
   }

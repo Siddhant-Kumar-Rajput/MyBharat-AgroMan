@@ -51,13 +51,13 @@ Until the predictive features and source pipelines are operational, describe the
 | --- | --- | --- |
 | Phone OTP profile | Live fictional OTP, token verification, record persistence and session restoration verified in Chromium | Required before persistent records. Production reCAPTCHA remains enabled. |
 | GPS captured and locked to profile | Not implemented by design | Replace with explicit consent, manual district fallback and optional coarse area. Never persist raw GPS. Location can be changed through a logged history rather than being permanently locked. |
-| Soil/climate baseline on profile | Data model context exists; new D1 has no imported reviewed context | Import separately reviewed regional context with date/source. Label modeled values as regional estimates, not farm measurements. |
+| Soil/climate baseline on profile | Six reviewed district context rows and boundaries are deployed with date/source | Keep modeled values labelled as regional estimates, not farm measurements; replace legacy GAUL geometry when a reviewed source is approved. |
 | Land size | Implemented per plot | Aggregate only when useful; preserve multiple plots and units. |
 | Mechanization and irrigation | Implemented per plot | Keep editable per plot because constraints may differ across a holding. Add bullock-drawn wording to the localized catalog. |
-| Current/most recent crop and time since harvest | Missing from onboarding | Add explicit onboarding fields and derive them from crop cycles once history exists. |
-| Crop-cycle logging | Foundation implemented | Add structured input applications, harvest, yield and periodic derived health assessments. |
+| Current/most recent crop and time since harvest | Implemented in onboarding with a derived day interval | Derive it from crop cycles once enough history exists, while retaining farmer correction. |
+| Crop-cycle logging | Structured farmer-reported input, harvest and yield events implemented | Add periodic derived health assessments with provenance and consent. |
 | Periodic crop photos | Upload/analysis exists only in advisory flow | Process ephemerally; persist only derived assessment, consent receipt, request ID and provenance. Do not persist raw photos. |
-| Pesticide/fertilizer history | Only indirectly represented by notes/ledger | Add structured input events: class, farmer-entered product, amount/unit, purpose, date and source. Do not produce dosage without authoritative evidence. |
+| Pesticide/fertilizer history | Structured input class, farmer-entered product, amount/unit, purpose, date and source implemented | Keep it historical and farmer-reported. Do not produce dosage without authoritative evidence. |
 | Soil trajectory and degradation risk | Missing | Add evidence-backed rules/models after structured input history exists. Clearly label modeled risk and uncertainty. |
 | Constraint-aware next-crop advice | Missing | Ground advice in plot, irrigation, mechanization, previous crop, harvest interval, current season and reviewed regional context. |
 | Farmer-owned portable record | JSON/CSV/print-to-PDF foundation implemented | Add human-readable provenance and correction history. It may support an application but is not bank, government or insurer verification. |
@@ -100,8 +100,8 @@ The reviewed Phase 1 snapshot is now imported into the Phase 2 D1 environment: s
 
 ### P1 — complete longitudinal record
 
-- Complete onboarding: recent crop and harvest interval.
-- Add structured input, harvest and yield events.
+- Completed: onboarding records recent crop and most recent harvest date, then shows the derived day interval.
+- Completed: structured farmer-reported input, harvest and yield events persist across sessions.
 - Connect real derived crop-health assessments to crop cycles.
 - Add record correction history and improved PDF presentation.
 - Add in-app follow-up queue and reviewer-sourced remedies.
