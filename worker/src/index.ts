@@ -643,6 +643,25 @@ async function route(request: Request, env: Env) {
     return json(request, env, { ok: true });
   }
 
+  if (path === "profile" && request.method === "DELETE") {
+    await env.DB.batch([
+      env.DB.prepare(
+        `DELETE FROM case_reviews WHERE case_id IN
+         (SELECT id FROM crop_health_cases WHERE subject_id = ?)`,
+      ).bind(subject),
+      env.DB.prepare("DELETE FROM case_outcomes WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM crop_health_cases WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM crop_events WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM ledger_entries WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM crop_cycles WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM farm_plots WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM record_exports WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM in_app_alerts WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM farmer_profiles WHERE subject_id = ?").bind(subject),
+    ]);
+    return json(request, env, { ok: true });
+  }
+
   if (path === "records" && request.method === "GET") {
     const [plots, cycles, events, ledger, cases, outcomes] = await Promise.all([
       env.DB.prepare("SELECT * FROM farm_plots WHERE subject_id = ? ORDER BY updated_at DESC").bind(subject).all(),

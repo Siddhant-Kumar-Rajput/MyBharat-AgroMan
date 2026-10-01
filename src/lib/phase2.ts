@@ -123,3 +123,7 @@ export async function persistDemoPhase2(state: Phase2State) {
 export async function phase2Post<T>(path: string, value: unknown): Promise<T> {
   return request<T>(path, value);
 }
+
+export async function deletePhase2Record() {
+  return request<{ ok: true }>("profile", undefined, "DELETE");
+}

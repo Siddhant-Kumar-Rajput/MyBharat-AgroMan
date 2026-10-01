@@ -1675,6 +1675,53 @@ footer > span {
   gap: 8px;
   margin-top: 18px;
 }
+.record-deletion {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.danger-link {
+  color: #8a2d24;
+}
+.deletion-confirmation {
+  border-left: 3px solid #a43a2f;
+  background: #f7e9e5;
+  padding: 16px;
+}
+.deletion-confirmation strong {
+  color: #652018;
+}
+.deletion-confirmation p,
+.record-notice {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.deletion-success {
+  max-width: 760px;
+  margin: 0 0 20px;
+  border-left: 3px solid #557a45;
+  background: #e8efe1;
+  padding: 12px 14px;
+  color: #294b2d;
+}
+.deletion-confirmation > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.danger-button {
+  border: 1px solid #7c281f;
+  border-radius: 4px;
+  background: #7c281f;
+  color: #fff;
+  padding: 11px 16px;
+  font-weight: 650;
+}
+.danger-button:hover:not(:disabled) {
+  background: #5e1d17;
+}
 .plot-chip,
 .cycle-tabs button {
   border: 1px solid var(--line);

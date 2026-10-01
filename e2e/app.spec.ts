@@ -184,6 +184,12 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download JSON" }).click();
   expect((await download).suggestedFilename()).toBe("agroman-farm-record.json");
+
+  await page.getByRole("button", { name: "Delete my farm record" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("This permanently removes your profile");
+  await page.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page.getByRole("heading", { name: "Create your farmer profile" })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("Your farm record was deleted.");
 });
 
 test("Hindi read aloud loads the on-device fallback", async ({

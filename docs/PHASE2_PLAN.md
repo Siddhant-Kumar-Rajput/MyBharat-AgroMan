@@ -49,7 +49,7 @@ Until the predictive features and source pipelines are operational, describe the
 
 | Original requirement | Current status | Phase 2 treatment |
 | --- | --- | --- |
-| Phone OTP profile | Foundation built; live reCAPTCHA flow needs repair | Required before persistent records. |
+| Phone OTP profile | Live fictional OTP, token verification, record persistence and session restoration verified in Chromium | Required before persistent records. Production reCAPTCHA remains enabled. |
 | GPS captured and locked to profile | Not implemented by design | Replace with explicit consent, manual district fallback and optional coarse area. Never persist raw GPS. Location can be changed through a logged history rather than being permanently locked. |
 | Soil/climate baseline on profile | Data model context exists; new D1 has no imported reviewed context | Import separately reviewed regional context with date/source. Label modeled values as regional estimates, not farm measurements. |
 | Land size | Implemented per plot | Aggregate only when useful; preserve multiple plots and units. |

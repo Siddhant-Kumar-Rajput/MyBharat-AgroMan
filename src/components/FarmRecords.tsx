@@ -24,7 +24,7 @@ import {
   type ProfileInput,
 } from "../../shared/domain";
 import { beginPhoneAuth, currentUser, demo, resetPhoneVerifier } from "../lib/api";
-import { loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
+import { deletePhase2Record, loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
 import type { ConfirmationResult, User } from "firebase/auth";
 
@@ -79,6 +79,8 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
   const [phone, setPhone] = useState("+91");
   const [code, setCode] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationResult>();
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [recordNotice, setRecordNotice] = useState("");
   const recaptcha = useRef<HTMLDivElement>(null);
   const [activeCycleId, setActiveCycleId] = useState("");
   const [profile, setProfile] = useState({ displayName: "", state: "", district: "" });
@@ -188,6 +190,18 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
         await phase2Post("profile", value);
         await refresh();
       }
+    });
+  }
+
+  function deleteRecord() {
+    void action(async () => {
+      if (demo) await persistDemoPhase2(emptyState);
+      else await deletePhase2Record();
+      setState(emptyState);
+      setProfile({ displayName: "", state: "", district: "" });
+      setActiveCycleId("");
+      setDeleteArmed(false);
+      setRecordNotice(t.recordDeleted);
     });
   }
 
@@ -329,6 +343,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
     <section className="records-page section">
       <div className="records-heading"><div><p className="eyebrow">{t.records}</p><h1>{t.profileTitle}</h1><p>{t.profileCopy}</p></div><ShieldCheck size={42} /></div>
       {demo && <div className="demo-banner"><ShieldCheck size={17} />{t.testIdentity} — {t.syntheticCase}</div>}
+      {recordNotice && <p className="record-notice deletion-success" role="status">{recordNotice}</p>}
       <form className="record-form" onSubmit={saveProfile}>
         <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
         <label>{t.state}<input value={profile.state} onChange={(event) => setProfile({ ...profile, state: event.target.value })} required /></label>
@@ -409,6 +424,21 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
           <div className="panel-title"><FileText /><div><h2>{t.exportRecord}</h2><p>{t.exportNotice}</p></div></div>
           <div className="export-actions"><button className="secondary" onClick={exportJson}><Download size={16} />{t.exportJson}</button><button className="secondary" onClick={exportCsv}><Download size={16} />{t.exportCsv}</button><button className="secondary" onClick={() => window.print()}><Printer size={16} />{t.printPdf}</button></div>
           <div className="helpline-card"><Phone size={20} /><div><strong>{t.helpline}</strong><p>{t.helplineCopy}</p><a href="tel:18001801551">1800-180-1551</a>{state.profile.state.toLowerCase() === "odisha" && <a href="tel:155333">155333 · Odisha</a>}</div></div>
+          <div className="record-deletion">
+            {!deleteArmed ? (
+              <button className="text-button danger-link" onClick={() => setDeleteArmed(true)}>{t.deleteRecord}</button>
+            ) : (
+              <div className="deletion-confirmation" role="alertdialog" aria-labelledby="delete-record-title" aria-describedby="delete-record-copy">
+                <strong id="delete-record-title">{t.deleteRecordTitle}</strong>
+                <p id="delete-record-copy">{t.deleteRecordCopy}</p>
+                <div>
+                  <button className="secondary" onClick={() => setDeleteArmed(false)}>{t.cancelDeleteRecord}</button>
+                  <button className="danger-button" disabled={busy} onClick={deleteRecord}>{t.confirmDeleteRecord}</button>
+                </div>
+              </div>
+            )}
+            {recordNotice && <p className="record-notice" role="status">{recordNotice}</p>}
+          </div>
         </article>
       </div>
     </section>

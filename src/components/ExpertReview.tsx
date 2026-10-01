@@ -11,6 +11,8 @@ export function ExpertReview({ copy: t, onError }: Props) {
   const [state, setState] = useState<Phase2State>();
   const [cases, setCases] = useState<CropHealthCase[]>([]);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     const load = demo
@@ -21,7 +23,12 @@ export function ExpertReview({ copy: t, onError }: Props) {
       : request<{ cases: CropHealthCase[] }>("expert/cases").then((value) =>
           setCases(value.cases),
         );
-    void load.catch((error) => onError(error.message));
+    void load
+      .catch((error) => {
+        setLoadFailed(true);
+        onError(error.message);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   async function approve(item: CropHealthCase) {
@@ -68,7 +75,11 @@ export function ExpertReview({ copy: t, onError }: Props) {
         </div>
       )}
       <div className="review-queue">
-        {!cases.length ? (
+        {loading ? (
+          <p>{t.loadingReview}</p>
+        ) : loadFailed ? (
+          <p>{t.reviewUnavailable}</p>
+        ) : !cases.length ? (
           <p>{t.noReviewCases}</p>
         ) : (
           cases.map((item) => (

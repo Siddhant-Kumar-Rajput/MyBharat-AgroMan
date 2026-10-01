@@ -156,9 +156,13 @@ async function headers() {
       : {}),
   };
 }
-export async function request<T>(path: string, body?: unknown): Promise<T> {
+export async function request<T>(
+  path: string,
+  body?: unknown,
+  method: "GET" | "POST" | "DELETE" = body ? "POST" : "GET",
+): Promise<T> {
   const response = await fetch(`${apiBase}/v1/${path}`, {
-    method: body ? "POST" : "GET",
+    method,
     headers: { "Content-Type": "application/json", ...(await headers()) },
     body: body ? JSON.stringify(body) : undefined,
   });
