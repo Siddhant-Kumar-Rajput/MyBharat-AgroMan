@@ -1,10 +1,15 @@
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
+  GoogleAuthProvider,
+  linkWithPopup,
   linkWithPhoneNumber,
   onAuthStateChanged,
   RecaptchaVerifier,
+  signInWithPhoneNumber,
+  signInWithPopup,
   signInAnonymously,
+  signOut,
   type Auth,
   type ConfirmationResult,
   type User,
@@ -48,6 +53,8 @@ let credentials:
 let appCheck: AppCheck | undefined;
 let firebaseApp: FirebaseApp | undefined;
 let firebaseAuth: Auth | undefined;
+let phoneVerifier: RecaptchaVerifier | undefined;
+let phoneVerifierContainer: HTMLElement | undefined;
 function firebase() {
   if (!firebaseApp) {
     firebaseApp =
@@ -73,21 +80,46 @@ export function observeUser(callback: (user: User | null) => void) {
   return onAuthStateChanged(firebase().auth, callback);
 }
 
-export async function beginPhoneLink(
+export function resetPhoneVerifier() {
+  phoneVerifier?.clear();
+  phoneVerifier = undefined;
+  phoneVerifierContainer?.replaceChildren();
+  phoneVerifierContainer = undefined;
+}
+
+export async function beginPhoneAuth(
   phoneNumber: string,
   container: HTMLElement,
+  intent: "link" | "signin" = "link",
 ): Promise<ConfirmationResult> {
   const { auth } = firebase();
-  const user = await currentUser();
-  const verifier = new RecaptchaVerifier(auth, container, {
-    size: "invisible",
-  });
+  if (phoneVerifierContainer !== container) resetPhoneVerifier();
+  phoneVerifier ??= new RecaptchaVerifier(auth, container, { size: "invisible" });
+  phoneVerifierContainer = container;
   try {
-    return await linkWithPhoneNumber(user, phoneNumber, verifier);
+    if (intent === "signin")
+      return await signInWithPhoneNumber(auth, phoneNumber, phoneVerifier);
+    return await linkWithPhoneNumber(await currentUser(), phoneNumber, phoneVerifier);
   } catch (error) {
-    verifier.clear();
+    resetPhoneVerifier();
     throw error;
   }
+}
+
+export async function beginGoogleAuth(intent: "link" | "signin" = "signin") {
+  const { auth } = firebase();
+  await auth.authStateReady();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  if (intent === "link" && auth.currentUser)
+    return (await linkWithPopup(auth.currentUser, provider)).user;
+  return (await signInWithPopup(auth, provider)).user;
+}
+
+export async function signOutUser() {
+  credentials = undefined;
+  resetPhoneVerifier();
+  await signOut(firebase().auth);
 }
 async function headers() {
   if (!credentials)

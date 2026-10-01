@@ -1,8 +1,24 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function enterAsGuest(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue as guest", exact: true }).first().click();
+}
+
+test("landing separates guest access from phone-gated farmer records", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Understand every season/ })).toBeVisible();
+  await expect(page.getByText("Phone verification is mandatory before any farmer profile or farm record is stored.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Farmer login / sign up", exact: true }).first().click();
+  await expect(page.getByRole("button", { name: /Continue with phone/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeVisible();
+  await expect(page.getByText("Phone verification is mandatory before any farmer profile or farm record is stored.")).toBeVisible();
+});
+
 test("photo consent contributes metadata without persisting photo data", async ({
   page,
 }) => {
-  await page.goto("/");
+  await enterAsGuest(page);
   await page
     .getByRole("button", { name: "Meet your farm advisor" })
     .first()
@@ -57,7 +73,7 @@ test("a thread stops accepting questions after eighteen turns", async ({
   page,
 }) => {
   test.setTimeout(60000);
-  await page.goto("/");
+  await enterAsGuest(page);
   await page
     .getByRole("button", { name: "Meet your farm advisor" })
     .first()
@@ -81,7 +97,7 @@ test("a thread stops accepting questions after eighteen turns", async ({
   await expect(page.getByRole("textbox")).toBeEnabled();
 });
 test("advisory persists a conversation after reload", async ({ page }) => {
-  await page.goto("/");
+  await enterAsGuest(page);
   await page
     .getByRole("button", { name: "Meet your farm advisor" })
     .first()
@@ -103,7 +119,7 @@ test("advisory persists a conversation after reload", async ({ page }) => {
 test("community and authority expose only labeled demo signals", async ({
   page,
 }) => {
-  await page.goto("/");
+  await enterAsGuest(page);
   await page.getByRole("button", { name: "Explore community watch" }).click();
   await expect(page.getByText("Synthetic demonstration reports")).toBeVisible();
   await expect(
@@ -123,7 +139,7 @@ test("community and authority expose only labeled demo signals", async ({
 test("language coverage is honest and layout fits the viewport", async ({
   page,
 }) => {
-  await page.goto("/");
+  await enterAsGuest(page);
   await page.getByLabel("Language", { exact: true }).selectOption("pa");
   await expect(
     page.getByText(
@@ -139,11 +155,8 @@ test("language coverage is honest and layout fits the viewport", async ({
 
 test("farmer can build and export a phase two farm record", async ({ page }) => {
   await page.goto("/");
-  const records = page.getByRole("button", { name: "Farm records", exact: true });
-  if (!(await records.isVisible())) {
-    await page.getByRole("button", { name: "Toggle navigation" }).click();
-  }
-  await records.click();
+  await page.getByRole("button", { name: "Farmer login / sign up", exact: true }).first().click();
+  await page.getByRole("button", { name: /Continue with phone/ }).click();
   await page.getByLabel("State").fill("Odisha");
   await page.getByLabel("District").fill("Cuttack");
   await page.getByRole("button", { name: "Save profile" }).click();
@@ -196,7 +209,7 @@ test("Hindi read aloud loads the on-device fallback", async ({
       return createBuffer.call(this, channels, length, sampleRate);
     };
   });
-  await page.goto("/");
+  await enterAsGuest(page);
   await page.getByLabel("Language", { exact: true }).selectOption("hi");
   await page
     .getByRole("button", { name: "Meet your farm advisor" })

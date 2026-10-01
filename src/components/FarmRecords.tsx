@@ -23,7 +23,7 @@ import {
   type Phase2State,
   type ProfileInput,
 } from "../../shared/domain";
-import { beginPhoneLink, currentUser, demo } from "../lib/api";
+import { beginPhoneAuth, currentUser, demo, resetPhoneVerifier } from "../lib/api";
 import { loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
 import type { ConfirmationResult, User } from "firebase/auth";
@@ -31,6 +31,7 @@ import type { ConfirmationResult, User } from "firebase/auth";
 type Props = {
   copy: Copy;
   locale: string;
+  phoneIntent?: "link" | "signin";
   onError: (message: string) => void;
 };
 
@@ -70,7 +71,7 @@ function download(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function FarmRecords({ copy: t, locale, onError }: Props) {
+export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: Props) {
   const [state, setState] = useState<Phase2State>(emptyState);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -122,7 +123,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
   useEffect(() => {
     if (demo) {
       void refresh().catch((error) => onError(error.message));
-      return;
+      return () => resetPhoneVerifier();
     }
     void currentUser()
       .then((value) => {
@@ -131,6 +132,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
         setLoaded(true);
       })
       .catch((error) => onError(error.message));
+    return () => resetPhoneVerifier();
   }, []);
 
   async function commit(next: Phase2State) {
@@ -153,7 +155,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
     event.preventDefault();
     void action(async () => {
       if (!recaptcha.current) throw new Error(t.error);
-      setConfirmation(await beginPhoneLink(phone, recaptcha.current));
+      setConfirmation(await beginPhoneAuth(phone, recaptcha.current, phoneIntent));
     });
   }
 
@@ -163,6 +165,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       if (!confirmation) throw new Error(t.error);
       const result = await confirmation.confirm(code);
       await result.user.getIdToken(true);
+      resetPhoneVerifier();
       setUser(result.user);
       await refresh();
     });

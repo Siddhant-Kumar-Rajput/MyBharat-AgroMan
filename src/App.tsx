@@ -48,7 +48,12 @@ import {
   prepareImage,
   request,
   currentPosition,
+  currentUser,
+  beginGoogleAuth,
+  observeUser,
+  signOutUser,
 } from "./lib/api";
+import type { User } from "firebase/auth";
 import { readThreads, saveThreads } from "./lib/storage";
 import { english, type Copy } from "./lib/i18n";
 import { speakText, stopSpeech } from "./lib/speech";
@@ -56,12 +61,20 @@ import { formatMetric } from "./lib/format";
 import { DistrictMap } from "./components/DistrictMap";
 import { FarmRecords } from "./components/FarmRecords";
 import { ExpertReview } from "./components/ExpertReview";
+import { EntryGateway } from "./components/EntryGateway";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert";
+type EntryMode = "visitor" | "guest" | "farmer";
 const photo =
   "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=2000&q=85";
 export default function App() {
   const [page, setPage] = useState<Page>("home");
+  const [entryMode, setEntryMode] = useState<EntryMode>(() => {
+    const stored = sessionStorage.getItem("agroman-entry-mode");
+    return stored === "guest" || stored === "farmer" ? stored : "visitor";
+  });
+  const [phoneIntent, setPhoneIntent] = useState<"link" | "signin">("link");
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [districtId, setDistrictId] = useState(() => {
     const stored = localStorage.getItem("agroman-district");
     return districts.some((d) => d.id === stored) ? stored! : "PB-LDH";
@@ -110,6 +123,10 @@ export default function App() {
   const syntheticWatch = demo || showExamples;
   const atLimit = current ? turns(current) >= MAX_TURNS : false;
   useEffect(() => {
+    if (demo) return;
+    return observeUser(setAuthUser);
+  }, []);
+  useEffect(() => {
     readThreads()
       .then((list) => {
         setThreads(list);
@@ -140,6 +157,7 @@ export default function App() {
       );
   }, [threads, loaded]);
   useEffect(() => {
+    if (entryMode === "visitor") return;
     let cancelled = false;
     setRegion(undefined);
     setBoundary(undefined);
@@ -149,8 +167,8 @@ export default function App() {
       .then((value) => {
         if (!cancelled) setRegion(value);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
+      .catch(() => {
+        if (!cancelled) setRegion(undefined);
       });
     if (demo) setReports(demoReports(districtId));
     else {
@@ -170,13 +188,13 @@ export default function App() {
           if (!cancelled) setBoundary(value.geometry);
         })
         .catch((e) => {
-          if (!cancelled) setError(e.message);
+          if (!cancelled) setBoundary(undefined);
         });
     }
     return () => {
       cancelled = true;
     };
-  }, [districtId]);
+  }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
     localStorage.setItem("agroman-locale", locale);
@@ -185,7 +203,7 @@ export default function App() {
       ? "rtl"
       : "ltr";
     setCopy(english);
-    if (locale !== "en" && !demo) {
+    if (locale !== "en" && !demo && entryMode !== "visitor") {
       setLanguageBusy(true);
       request<Copy>("translate/ui", { locale })
         .then((value) => {
@@ -201,7 +219,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [locale, entryMode]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [current?.messages.length, busy]);
@@ -235,6 +253,7 @@ export default function App() {
   useGSAP(
     () => {
       if (
+        entryMode === "visitor" ||
         page !== "home" ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches
       )
@@ -274,12 +293,44 @@ export default function App() {
         },
       );
     },
-    { scope: root, dependencies: [page], revertOnUpdate: true },
+    { scope: root, dependencies: [page, entryMode], revertOnUpdate: true },
   );
   function go(next: Page) {
     if (busy) return;
+    if (next === "records" && entryMode === "guest") setPhoneIntent("link");
     setPage(next);
     setMenu(false);
+    setError("");
+    window.scrollTo(0, 0);
+  }
+  async function enterGuest() {
+    if (!demo) await currentUser();
+    sessionStorage.setItem("agroman-entry-mode", "guest");
+    setEntryMode("guest");
+    setPage("home");
+  }
+  function enterWithPhone() {
+    sessionStorage.setItem("agroman-entry-mode", "farmer");
+    setPhoneIntent("signin");
+    setEntryMode("farmer");
+    setPage("records");
+  }
+  async function enterWithGoogle() {
+    if (!demo) {
+      const user = await beginGoogleAuth("signin");
+      setAuthUser(user);
+    }
+    sessionStorage.setItem("agroman-entry-mode", "farmer");
+    setPhoneIntent("link");
+    setEntryMode("farmer");
+    setPage("records");
+  }
+  async function leaveExperience() {
+    if (!demo) await signOutUser();
+    sessionStorage.removeItem("agroman-entry-mode");
+    setAuthUser(null);
+    setEntryMode("visitor");
+    setPage("home");
     setError("");
     window.scrollTo(0, 0);
   }
@@ -542,6 +593,23 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   }
+  if (entryMode === "visitor")
+    return (
+      <EntryGateway
+        copy={copy}
+        error={error}
+        onGuest={enterGuest}
+        onPhone={enterWithPhone}
+        onGoogle={enterWithGoogle}
+        onError={setError}
+        onDismissError={() => setError("")}
+      />
+    );
+  const identityLabel = authUser?.phoneNumber
+    ? t("verifiedFarmer")
+    : authUser?.providerData.some((provider) => provider.providerId === "google.com")
+      ? t("googleLinked")
+      : t("guestSession");
   const locationSelector = (
     <div className="location-select">
       <MapPin size={17} />
@@ -617,6 +685,10 @@ export default function App() {
             onClick={() => setMenu(!menu)}
           >
             <Menu />
+          </button>
+          <button className="identity-switch" onClick={() => void leaveExperience()} aria-label={t("switchAccount")}>
+            <ShieldCheck size={15} />
+            {identityLabel}
           </button>
           <button className="nav-cta" onClick={() => go("advisor")}>
             {t("openAdvisor")}
@@ -1058,7 +1130,7 @@ export default function App() {
             </div>
           </section>
         ) : page === "records" ? (
-          <FarmRecords copy={copy} locale={locale} onError={setError} />
+          <FarmRecords copy={copy} locale={locale} phoneIntent={phoneIntent} onError={setError} />
         ) : page === "expert" ? (
           <ExpertReview copy={copy} onError={setError} />
         ) : (
