@@ -18,7 +18,7 @@
     "FIREBASE_PROJECT_NUMBER": "615656223888",
     "FIREBASE_APP_ID": "1:615656223888:web:e9d6b3e61df236e7219415",
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
-    "ALLOWED_ORIGINS": "http://localhost:5173,https://mybharat-agroman.web.app,https://mybharat-agroman.firebaseapp.com",
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,https://mybharat-agroman.web.app,https://mybharat-agroman.firebaseapp.com",
     "REQUIRE_APP_CHECK": "false",
     "DAILY_REQUEST_LIMIT": "40",
   },

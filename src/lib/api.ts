@@ -66,6 +66,12 @@ function firebase() {
         appId: import.meta.env.VITE_FIREBASE_APP_ID,
       });
     firebaseAuth = getAuth(firebaseApp);
+    if (
+      import.meta.env.MODE === "test" &&
+      new URLSearchParams(window.location.search).has("live-auth-test")
+    ) {
+      firebaseAuth.settings.appVerificationDisabledForTesting = true;
+    }
   }
   return { app: firebaseApp, auth: firebaseAuth! };
 }
