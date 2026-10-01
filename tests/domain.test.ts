@@ -6,6 +6,12 @@ import {
   rotateThreads,
   newThread,
   languages,
+  confidenceBand,
+  cropCycleInputSchema,
+  matchCases,
+  summarizeLedger,
+  type CropHealthCase,
+  type LedgerEntry,
   type Report,
 } from "../shared/domain";
 const now = Date.now();
@@ -124,5 +130,73 @@ describe("request and session contracts", () => {
         history: Array(37).fill({ role: "user", text: "hello" }),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("phase two farm records", () => {
+  it("summarizes expenses, revenue and margin in paise", () => {
+    const base = {
+      id: crypto.randomUUID(),
+      cycleId: crypto.randomUUID(),
+      category: "seed" as const,
+      occurredOn: "2026-10-01",
+      note: "",
+      createdAt: now,
+    };
+    const entries: LedgerEntry[] = [
+      { ...base, kind: "expense", amountPaise: 125050 },
+      { ...base, id: crypto.randomUUID(), kind: "revenue", category: "sale", amountPaise: 300000 },
+    ];
+    expect(summarizeLedger(entries)).toEqual({
+      expensesPaise: 125050,
+      revenuePaise: 300000,
+      marginPaise: 174950,
+    });
+  });
+
+  it("uses explicit confidence bands without calling them certainty", () => {
+    expect(confidenceBand(0.74)).toBe("low");
+    expect(confidenceBand(0.75)).toBe("moderate");
+    expect(confidenceBand(0.9)).toBe("high");
+  });
+
+  it("validates priority crop cycles and ISO dates", () => {
+    const value = {
+      plotId: crypto.randomUUID(),
+      cropCode: "RICE",
+      variety: "",
+      startedOn: "2026-10-01",
+      expectedHarvestOn: "",
+    };
+    expect(cropCycleInputSchema.safeParse(value).success).toBe(true);
+    expect(cropCycleInputSchema.safeParse({ ...value, cropCode: "MANGO" }).success).toBe(false);
+    expect(cropCycleInputSchema.safeParse({ ...value, startedOn: "tomorrow" }).success).toBe(false);
+  });
+
+  it("retrieves only sufficiently similar closed cases", () => {
+    const base: CropHealthCase = {
+      id: crypto.randomUUID(),
+      reference: "AGM-1",
+      cycleId: crypto.randomUUID(),
+      cropCode: "RICE",
+      diseaseCode: "RICE_BLAST",
+      diseaseName: "Rice blast",
+      symptoms: ["leaf lesion"],
+      confidence: 0.84,
+      confidenceBand: "moderate",
+      district: "Cuttack",
+      cropStage: "vegetative",
+      season: "kharif",
+      status: "pending_review",
+      origin: "synthetic",
+      consentVersion: "2026-10-01",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const closed = { ...base, id: crypto.randomUUID(), reference: "AGM-2", status: "closed" as const };
+    const pending = { ...base, id: crypto.randomUUID(), reference: "AGM-3" };
+    expect(matchCases(base, [closed, pending])).toEqual([
+      expect.objectContaining({ reference: "AGM-2", score: 98 }),
+    ]);
   });
 });

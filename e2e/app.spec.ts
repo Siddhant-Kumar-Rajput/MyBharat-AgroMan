@@ -137,6 +137,42 @@ test("language coverage is honest and layout fits the viewport", async ({
   ).toBe(true);
 });
 
+test("farmer can build and export a phase two farm record", async ({ page }) => {
+  await page.goto("/");
+  const records = page.getByRole("button", { name: "Farm records", exact: true });
+  if (!(await records.isVisible())) {
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+  }
+  await records.click();
+  await page.getByLabel("State").fill("Odisha");
+  await page.getByLabel("District").fill("Cuttack");
+  await page.getByRole("button", { name: "Save profile" }).click();
+
+  await page.getByLabel("Plot name").fill("North field");
+  await page.getByLabel("Area", { exact: true }).fill("2.5");
+  await page.getByRole("button", { name: "Create plot" }).click();
+  await expect(page.getByRole("button", { name: /North field/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Start cycle" }).click();
+  await expect(page.getByText("Active crop cycle: Rice")).toBeVisible();
+  await page.getByLabel("Activity title").fill("First irrigation");
+  await page.getByRole("button", { name: "Save activity" }).click();
+  await expect(page.getByText("First irrigation")).toBeVisible();
+
+  await page.getByLabel("Amount in rupees").fill("1250.50");
+  await page.getByRole("button", { name: "Save entry" }).click();
+  await expect(page.getByText("₹1,250.5")).toBeVisible();
+
+  await page.getByRole("button", { name: "Create labelled example case" }).click();
+  await expect(page.getByText("Model score, not diagnostic certainty or probability of a cure.").first()).toBeVisible();
+  await expect(page.getByText(/AGM-DEMO-/)).toBeVisible();
+  await expect(page.getByText("155333 · Odisha")).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download JSON" }).click();
+  expect((await download).suggestedFilename()).toBe("agroman-farm-record.json");
+});
+
 test("Hindi read aloud loads the on-device fallback", async ({
   page,
 }, testInfo) => {

@@ -1,5 +1,14 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import {
+  getAuth,
+  linkWithPhoneNumber,
+  onAuthStateChanged,
+  RecaptchaVerifier,
+  signInAnonymously,
+  type Auth,
+  type ConfirmationResult,
+  type User,
+} from "firebase/auth";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
@@ -37,22 +46,59 @@ let credentials:
   | Promise<{ authorization: string; "X-Firebase-AppCheck"?: string }>
   | undefined;
 let appCheck: AppCheck | undefined;
-async function headers() {
-  if (!credentials)
-    credentials = (async () => {
-      const app = initializeApp({
+let firebaseApp: FirebaseApp | undefined;
+let firebaseAuth: Auth | undefined;
+function firebase() {
+  if (!firebaseApp) {
+    firebaseApp =
+      getApps()[0] ??
+      initializeApp({
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
         appId: import.meta.env.VITE_FIREBASE_APP_ID,
       });
+    firebaseAuth = getAuth(firebaseApp);
+  }
+  return { app: firebaseApp, auth: firebaseAuth! };
+}
+
+export async function currentUser(): Promise<User> {
+  const { auth } = firebase();
+  await auth.authStateReady();
+  return auth.currentUser ?? (await signInAnonymously(auth)).user;
+}
+
+export function observeUser(callback: (user: User | null) => void) {
+  return onAuthStateChanged(firebase().auth, callback);
+}
+
+export async function beginPhoneLink(
+  phoneNumber: string,
+  container: HTMLElement,
+): Promise<ConfirmationResult> {
+  const { auth } = firebase();
+  const user = await currentUser();
+  const verifier = new RecaptchaVerifier(auth, container, {
+    size: "invisible",
+  });
+  try {
+    return await linkWithPhoneNumber(user, phoneNumber, verifier);
+  } catch (error) {
+    verifier.clear();
+    throw error;
+  }
+}
+async function headers() {
+  if (!credentials)
+    credentials = (async () => {
+      const { app, auth } = firebase();
       const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
       if (siteKey)
         appCheck = initializeAppCheck(app, {
           provider: new ReCaptchaV3Provider(siteKey),
           isTokenAutoRefreshEnabled: true,
         });
-      const auth = getAuth(app);
       await auth.authStateReady();
       const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
       return {
@@ -64,7 +110,7 @@ async function headers() {
     })();
   // Refresh credentials for each request; Firebase manages token caching/renewal.
   await credentials;
-  const auth = getAuth();
+  const auth = firebase().auth;
   return {
     authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
     ...(appCheck

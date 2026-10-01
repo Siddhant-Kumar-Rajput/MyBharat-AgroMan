@@ -1,6 +1,6 @@
 # AgroMan working conventions
 
-- Implement Phase 1 only. Do not create farmer profiles, OTP login, crop histories, insurance records or export-demand features.
+- Implement the Phase 2 extension on top of the frozen Phase 1 baseline. The active competition scope is progressive phone-OTP identity, minimal farmer profiles, multiple plots, crop-cycle records and exports, derived crop-health cases with expert-review workflows, a thin farm ledger, and later demand-signal interfaces. Keep incomplete or unverified capabilities explicitly labelled and do not imply live expert, government, bank, or insurer integration.
 - Use the user-requested gpt-tasteskill for frontend development. Source: https://github.com/Leonxlnx/taste-skill/tree/main/skills/gpt-tasteskill . Installed on this workstation at `C:/Users/srajput/.codex/skills/gpt-tasteskill/SKILL.md`; read it before design work. Keep farmer usability and reduced-motion accessibility ahead of decorative effects.
 - Use `codex/*` branches. Preserve existing work and secrets. Review and test coherent changes before committing.
 - `npm run check` builds frontend/backend and runs domain tests. `npm run test:e2e` runs desktop/mobile browser tests.

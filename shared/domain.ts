@@ -26,6 +26,15 @@ export const languages = [
 ] as const;
 export const MAX_THREADS = 3;
 export const MAX_TURNS = 18;
+export const PHASE2_CONSENT_VERSION = "2026-10-01";
+export const priorityCrops = [
+  ["RICE", "Rice"],
+  ["WHEAT", "Wheat"],
+  ["COTTON", "Cotton"],
+  ["SUGARCANE", "Sugarcane"],
+  ["MAIZE", "Maize"],
+  ["TOMATO", "Tomato"],
+] as const;
 export const districts = [
   { id: "PB-LDH", state: "Punjab", name: "Ludhiana", lat: 30.901, lon: 75.857 },
   { id: "PB-ASR", state: "Punjab", name: "Amritsar", lat: 31.634, lon: 74.872 },
@@ -146,6 +155,148 @@ export type GeoPolygon = GeoPoint[][];
 export type DistrictGeometry =
   | { type: "Polygon"; coordinates: GeoPolygon }
   | { type: "MultiPolygon"; coordinates: GeoPolygon[] };
+
+export const profileInputSchema = z.object({
+  displayName: z.string().trim().max(120).optional().default(""),
+  locale: z.string().refine((value) => languages.some(([code]) => code === value)),
+  state: z.string().trim().min(2).max(100),
+  district: z.string().trim().min(2).max(120),
+  consentVersion: z.literal(PHASE2_CONSENT_VERSION),
+});
+export type ProfileInput = z.infer<typeof profileInputSchema>;
+export type FarmerProfile = ProfileInput & {
+  createdAt: number;
+  updatedAt: number;
+};
+
+export const plotInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  area: z.number().positive().max(100000),
+  areaUnit: z.enum(["acre", "hectare"]),
+  irrigation: z.enum(["rainfed", "canal", "sprinkler", "drip", "borewell", "other"]),
+  mechanization: z.enum(["manual", "animal", "partial", "tractor"]),
+  state: z.string().trim().min(2).max(100),
+  district: z.string().trim().min(2).max(120),
+  coarseCell: z.string().max(32).optional(),
+});
+export type PlotInput = z.infer<typeof plotInputSchema>;
+export type FarmPlot = PlotInput & {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export const cropCycleInputSchema = z.object({
+  plotId: z.string().uuid(),
+  cropCode: z.enum(priorityCrops.map(([code]) => code) as [
+    (typeof priorityCrops)[number][0],
+    ...(typeof priorityCrops)[number][0][],
+  ]),
+  variety: z.string().trim().max(100).optional().default(""),
+  startedOn: z.string().date(),
+  expectedHarvestOn: z.string().date().optional().or(z.literal("")),
+});
+export type CropCycleInput = z.infer<typeof cropCycleInputSchema>;
+export type CropCycle = CropCycleInput & {
+  id: string;
+  status: "active" | "harvested" | "archived";
+  createdAt: number;
+  updatedAt: number;
+};
+
+export const cycleEventInputSchema = z.object({
+  cycleId: z.string().uuid(),
+  type: z.enum(["sowing", "irrigation", "input", "assessment", "advice", "harvest", "note"]),
+  occurredOn: z.string().date(),
+  title: z.string().trim().min(1).max(120),
+  detail: z.string().trim().max(1000).optional().default(""),
+  source: z.enum(["farmer", "ai", "expert", "system"]).default("farmer"),
+});
+export type CycleEventInput = z.infer<typeof cycleEventInputSchema>;
+export type CropEvent = CycleEventInput & { id: string; createdAt: number };
+
+export const ledgerEntryInputSchema = z.object({
+  cycleId: z.string().uuid(),
+  kind: z.enum(["expense", "revenue"]),
+  category: z.enum(["seed", "fertilizer", "pesticide", "labour", "irrigation", "equipment", "harvest", "sale", "other"]),
+  amountPaise: z.number().int().nonnegative().max(100000000000),
+  occurredOn: z.string().date(),
+  note: z.string().trim().max(300).optional().default(""),
+});
+export type LedgerEntryInput = z.infer<typeof ledgerEntryInputSchema>;
+export type LedgerEntry = LedgerEntryInput & { id: string; createdAt: number };
+
+export type LedgerSummary = { expensesPaise: number; revenuePaise: number; marginPaise: number };
+export function summarizeLedger(entries: LedgerEntry[]): LedgerSummary {
+  const expensesPaise = entries.filter((entry) => entry.kind === "expense").reduce((sum, entry) => sum + entry.amountPaise, 0);
+  const revenuePaise = entries.filter((entry) => entry.kind === "revenue").reduce((sum, entry) => sum + entry.amountPaise, 0);
+  return { expensesPaise, revenuePaise, marginPaise: revenuePaise - expensesPaise };
+}
+
+export type ConfidenceBand = "low" | "moderate" | "high";
+export function confidenceBand(score: number): ConfidenceBand {
+  if (score < 0.75) return "low";
+  return score < 0.9 ? "moderate" : "high";
+}
+
+export type CaseStatus = "ai_assessed" | "pending_review" | "reviewed" | "undetermined" | "follow_up_due" | "closed";
+export type CropHealthCase = {
+  id: string;
+  reference: string;
+  cycleId: string;
+  cropCode: string;
+  diseaseCode: string;
+  diseaseName: string;
+  symptoms: string[];
+  confidence: number;
+  confidenceBand: ConfidenceBand;
+  district: string;
+  coarseCell?: string;
+  cropStage: string;
+  season: string;
+  status: CaseStatus;
+  origin: "synthetic" | "live";
+  consentVersion: typeof PHASE2_CONSENT_VERSION;
+  createdAt: number;
+  updatedAt: number;
+};
+export type CaseOutcome = {
+  id: string;
+  caseId: string;
+  intervalDays: 3 | 7;
+  result: "resolved" | "improved" | "unchanged" | "worse" | "unable";
+  note: string;
+  createdAt: number;
+};
+export type CaseMatch = { caseId: string; reference: string; score: number; reasons: string[] };
+export function matchCases(target: CropHealthCase, candidates: CropHealthCase[]): CaseMatch[] {
+  return candidates
+    .filter((candidate) => candidate.id !== target.id && candidate.status === "closed")
+    .map((candidate) => {
+      let score = 0;
+      const reasons: string[] = [];
+      if (candidate.cropCode === target.cropCode) { score += 40; reasons.push("same crop"); }
+      if (candidate.diseaseCode === target.diseaseCode) { score += 35; reasons.push("same suspected condition"); }
+      if (candidate.cropStage === target.cropStage) { score += 10; reasons.push("same crop stage"); }
+      if (candidate.season === target.season) { score += 8; reasons.push("same season"); }
+      if (candidate.district === target.district) { score += 5; reasons.push("same district"); }
+      if (candidate.coarseCell && candidate.coarseCell === target.coarseCell) { score += 2; reasons.push("nearby coarse area"); }
+      return { caseId: candidate.id, reference: candidate.reference, score, reasons };
+    })
+    .filter((match) => match.score >= 75)
+    .sort((a, b) => b.score - a.score || a.reference.localeCompare(b.reference))
+    .slice(0, 3);
+}
+
+export type Phase2State = {
+  profile?: FarmerProfile;
+  plots: FarmPlot[];
+  cycles: CropCycle[];
+  events: CropEvent[];
+  ledger: LedgerEntry[];
+  cases: CropHealthCase[];
+  outcomes: CaseOutcome[];
+};
 export function distanceKm(
   a: { lat: number; lon: number },
   b: { lat: number; lon: number },

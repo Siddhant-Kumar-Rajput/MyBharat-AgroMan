@@ -54,8 +54,10 @@ import { english, type Copy } from "./lib/i18n";
 import { speakText, stopSpeech } from "./lib/speech";
 import { formatMetric } from "./lib/format";
 import { DistrictMap } from "./components/DistrictMap";
+import { FarmRecords } from "./components/FarmRecords";
+import { ExpertReview } from "./components/ExpertReview";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
-type Page = "home" | "advisor" | "community" | "authority";
+type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert";
 const photo =
   "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=2000&q=85";
 export default function App() {
@@ -584,7 +586,7 @@ export default function App() {
           className={menu ? "nav-links open" : "nav-links"}
           aria-label={t("navigation")}
         >
-          {(["home", "advisor", "community"] as Page[]).map((item) => (
+          {(["home", "advisor", "records", "community"] as Page[]).map((item) => (
             <button
               key={item}
               className={page === item ? "selected" : ""}
@@ -1055,6 +1057,10 @@ export default function App() {
               </p>
             </div>
           </section>
+        ) : page === "records" ? (
+          <FarmRecords copy={copy} locale={locale} onError={setError} />
+        ) : page === "expert" ? (
+          <ExpertReview copy={copy} onError={setError} />
         ) : (
           <section className="watch-page section">
             <div className="watch-heading">
@@ -1155,13 +1161,14 @@ export default function App() {
         </button>
         <p>{t("footer")}</p>
         <a
-          href="https://github.com/Siddhant-Kumar-Rajput/AgroMan"
+          href="https://github.com/Siddhant-Kumar-Rajput/MyBharat-AgroMan"
           target="_blank"
           rel="noreferrer"
         >
           GitHub <ExternalLink size={13} />
         </a>
-        <span>PHASE 1 / 2026</span>
+        <button className="footer-link" onClick={() => go("expert")}>{t("expert")}</button>
+        <span>PHASE 2 / 2026</span>
       </footer>
       {consent && (
         <div

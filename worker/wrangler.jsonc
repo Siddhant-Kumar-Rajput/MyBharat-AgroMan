@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "agroman-api",
+  "name": "mybharat-agroman-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-28",
   "workers_dev": true,
@@ -8,21 +8,21 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "agroman",
-      "database_id": "96e9c6b4-54a5-4bb4-8336-80c41fd8e0ae",
+      "database_name": "mybharat-agroman",
+      "database_id": "REPLACE_WITH_PHASE2_D1_DATABASE_ID",
       "migrations_dir": "migrations",
     },
   ],
   "vars": {
-    "FIREBASE_PROJECT_ID": "smart-venue-orchestrator",
-    "FIREBASE_PROJECT_NUMBER": "391981839585",
-    "FIREBASE_APP_ID": "1:391981839585:web:d5941cf904832418d3b3a0",
+    "FIREBASE_PROJECT_ID": "REPLACE_WITH_PHASE2_FIREBASE_PROJECT_ID",
+    "FIREBASE_PROJECT_NUMBER": "REPLACE_WITH_PHASE2_PROJECT_NUMBER",
+    "FIREBASE_APP_ID": "REPLACE_WITH_PHASE2_FIREBASE_APP_ID",
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
-    "ALLOWED_ORIGINS": "http://localhost:5173,https://agroman-siddhant-rajput.web.app,https://agroman-siddhant-rajput.firebaseapp.com",
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://REPLACE_WITH_PHASE2_HOST.web.app",
     "REQUIRE_APP_CHECK": "false",
     "DAILY_REQUEST_LIMIT": "40",
   },
   "secrets": {
-    "required": ["GEMINI_API_KEY", "SARVAM_API_KEY"],
+    "required": ["GEMINI_API_KEY", "SARVAM_API_KEY", "SUBJECT_ID_KEY", "REVIEWER_UID_HASHES"],
   },
 }

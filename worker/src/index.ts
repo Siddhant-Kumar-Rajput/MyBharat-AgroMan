@@ -3,12 +3,21 @@ import { z } from "zod";
 import {
   adviceSchema,
   answerSchema,
+  confidenceBand,
   clusterReports,
+  cropCycleInputSchema,
+  cycleEventInputSchema,
   districts,
+  ledgerEntryInputSchema,
   languages,
+  matchCases,
   MAX_TURNS,
+  PHASE2_CONSENT_VERSION,
+  plotInputSchema,
   positionSchema,
+  profileInputSchema,
   type Context,
+  type CropHealthCase,
   type Diagnosis,
   type Report,
 } from "../../shared/domain";
@@ -26,6 +35,8 @@ interface Env {
   ALLOWED_ORIGINS: string;
   REQUIRE_APP_CHECK: string;
   DAILY_REQUEST_LIMIT: string;
+  SUBJECT_ID_KEY?: string;
+  REVIEWER_UID_HASHES?: string;
 }
 
 class ApiError extends Error {
@@ -150,7 +161,7 @@ function corsHeaders(request: Request, env: Env) {
     ...(origin ? { "Access-Control-Allow-Origin": origin } : {}),
     "Access-Control-Allow-Headers":
       "Authorization, Content-Type, X-Firebase-AppCheck",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Cache-Control": "no-store",
     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "Referrer-Policy": "no-referrer",
@@ -176,6 +187,30 @@ async function sha256(value: string) {
     .join("");
 }
 
+async function hmac(value: string, key: string) {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(signature)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function subjectId(env: Env, uid: string) {
+  if (!env.SUBJECT_ID_KEY)
+    throw new ApiError(503, "Phase 2 identity storage is not configured.");
+  return hmac(uid, env.SUBJECT_ID_KEY);
+}
+
 async function authenticate(request: Request, env: Env) {
   const match = request.headers.get("Authorization")?.match(/^Bearer (.+)$/);
   if (!match) throw new ApiError(401, "Sign in anonymously to continue.");
@@ -198,7 +233,10 @@ async function authenticate(request: Request, env: Env) {
       if (verified.payload.sub !== env.FIREBASE_APP_ID)
         throw new Error("Unexpected Firebase app");
     }
-    return payload.sub;
+    return {
+      uid: payload.sub,
+      phoneVerified: typeof payload.phone_number === "string",
+    };
   } catch {
     throw new ApiError(
       401,
@@ -515,8 +553,378 @@ async function route(request: Request, env: Env) {
       headers: corsHeaders(request, env),
     });
 
-  const uid = await authenticate(request, env);
+  const auth = await authenticate(request, env);
+  const uid = auth.uid;
   await rateLimit(env, uid, "all", 300);
+
+  if (request.method === "GET" && path === "helplines") {
+    const state = (url.searchParams.get("state") || "").trim().toLowerCase();
+    return json(request, env, {
+      helplines: [
+        {
+          id: "in-kcc",
+          name: "Kisan Call Centre",
+          number: "18001801551",
+          displayNumber: "1800-180-1551",
+          scope: "India",
+          hours: "6:00 AM–10:00 PM, every day",
+          source: "https://dackkms.gov.in/account/aboutus.aspx",
+        },
+        ...(state === "odisha"
+          ? [
+              {
+                id: "od-ksh",
+                name: "Krushi Samrudhi Helpline",
+                number: "155333",
+                displayNumber: "155333",
+                scope: "Odisha",
+                hours: "Government of Odisha service",
+                source: "https://krushisamrudhihelpline.in/about/en/",
+              },
+            ]
+          : []),
+      ],
+    });
+  }
+
+  const persistentPhase2Path = /^(profile|records|plots|cycles|events|ledger|exports|cases|expert)(\/|$)/.test(path);
+  if (persistentPhase2Path && !auth.phoneVerified)
+    throw new ApiError(403, "Verify your phone number to use persistent farm records.");
+  const subject = persistentPhase2Path ? await subjectId(env, uid) : "";
+
+  if (path === "profile" && request.method === "GET") {
+    const row = await env.DB.prepare(
+      `SELECT display_name, locale, state, district, consent_version, created_at, updated_at
+       FROM farmer_profiles WHERE subject_id = ?`,
+    )
+      .bind(subject)
+      .first<Record<string, string | number>>();
+    return json(request, env, {
+      profile: row
+        ? {
+            displayName: row.display_name,
+            locale: row.locale,
+            state: row.state,
+            district: row.district,
+            consentVersion: row.consent_version,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }
+        : null,
+    });
+  }
+
+  if (path === "profile" && request.method === "POST") {
+    const input = profileInputSchema.parse(await body(request));
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO farmer_profiles
+       (subject_id, display_name, locale, state, district, consent_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(subject_id) DO UPDATE SET
+         display_name = excluded.display_name,
+         locale = excluded.locale,
+         state = excluded.state,
+         district = excluded.district,
+         consent_version = excluded.consent_version,
+         updated_at = excluded.updated_at`,
+    )
+      .bind(
+        subject,
+        input.displayName,
+        input.locale,
+        input.state,
+        input.district,
+        input.consentVersion,
+        now,
+        now,
+      )
+      .run();
+    return json(request, env, { ok: true });
+  }
+
+  if (path === "records" && request.method === "GET") {
+    const [plots, cycles, events, ledger, cases, outcomes] = await Promise.all([
+      env.DB.prepare("SELECT * FROM farm_plots WHERE subject_id = ? ORDER BY updated_at DESC").bind(subject).all(),
+      env.DB.prepare("SELECT * FROM crop_cycles WHERE subject_id = ? ORDER BY updated_at DESC").bind(subject).all(),
+      env.DB.prepare("SELECT * FROM crop_events WHERE subject_id = ? ORDER BY occurred_on DESC").bind(subject).all(),
+      env.DB.prepare("SELECT * FROM ledger_entries WHERE subject_id = ? ORDER BY occurred_on DESC").bind(subject).all(),
+      env.DB.prepare("SELECT * FROM crop_health_cases WHERE subject_id = ? ORDER BY updated_at DESC").bind(subject).all(),
+      env.DB.prepare("SELECT * FROM case_outcomes WHERE subject_id = ? ORDER BY created_at DESC").bind(subject).all(),
+    ]);
+    return json(request, env, {
+      plots: plots.results,
+      cycles: cycles.results,
+      events: events.results,
+      ledger: ledger.results,
+      cases: cases.results,
+      outcomes: outcomes.results,
+    });
+  }
+
+  if (path === "plots" && request.method === "POST") {
+    const input = plotInputSchema.parse(await body(request));
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO farm_plots
+       (id, subject_id, name, area, area_unit, irrigation, mechanization, state, district, coarse_cell, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(id, subject, input.name, input.area, input.areaUnit, input.irrigation, input.mechanization, input.state, input.district, input.coarseCell || null, now, now)
+      .run();
+    return json(request, env, { id }, 201);
+  }
+
+  if (path === "cycles" && request.method === "POST") {
+    const input = cropCycleInputSchema.parse(await body(request));
+    const plot = await env.DB.prepare("SELECT id FROM farm_plots WHERE id = ? AND subject_id = ?")
+      .bind(input.plotId, subject)
+      .first();
+    if (!plot) throw new ApiError(404, "Farm plot not found.");
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO crop_cycles
+       (id, subject_id, plot_id, crop_code, variety, started_on, expected_harvest_on, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+    )
+      .bind(id, subject, input.plotId, input.cropCode, input.variety, input.startedOn, input.expectedHarvestOn || null, now, now)
+      .run();
+    return json(request, env, { id }, 201);
+  }
+
+  if (path === "events" && request.method === "POST") {
+    const input = cycleEventInputSchema.parse(await body(request));
+    const cycle = await env.DB.prepare("SELECT id FROM crop_cycles WHERE id = ? AND subject_id = ?")
+      .bind(input.cycleId, subject)
+      .first();
+    if (!cycle) throw new ApiError(404, "Crop cycle not found.");
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO crop_events
+       (id, subject_id, cycle_id, event_type, occurred_on, title, detail, source, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(id, subject, input.cycleId, input.type, input.occurredOn, input.title, input.detail, input.source, Date.now())
+      .run();
+    return json(request, env, { id }, 201);
+  }
+
+  if (path === "ledger" && request.method === "POST") {
+    const input = ledgerEntryInputSchema.parse(await body(request));
+    const cycle = await env.DB.prepare("SELECT id FROM crop_cycles WHERE id = ? AND subject_id = ?")
+      .bind(input.cycleId, subject)
+      .first();
+    if (!cycle) throw new ApiError(404, "Crop cycle not found.");
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO ledger_entries
+       (id, subject_id, cycle_id, kind, category, amount_paise, occurred_on, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(id, subject, input.cycleId, input.kind, input.category, input.amountPaise, input.occurredOn, input.note, Date.now())
+      .run();
+    return json(request, env, { id }, 201);
+  }
+
+  if (path === "exports" && request.method === "POST") {
+    const counts = await env.DB.prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM farm_plots WHERE subject_id = ?) AS plots,
+        (SELECT COUNT(*) FROM crop_cycles WHERE subject_id = ?) AS cycles,
+        (SELECT COUNT(*) FROM crop_events WHERE subject_id = ?) AS events,
+        (SELECT COUNT(*) FROM ledger_entries WHERE subject_id = ?) AS ledger`,
+    )
+      .bind(subject, subject, subject, subject)
+      .first<{ plots: number; cycles: number; events: number; ledger: number }>();
+    const id = crypto.randomUUID();
+    const createdAt = Date.now();
+    const recordCount = (counts?.plots || 0) + (counts?.cycles || 0) + (counts?.events || 0) + (counts?.ledger || 0);
+    const contentHash = await sha256(`${subject}:${recordCount}:${createdAt}`);
+    await env.DB.prepare(
+      "INSERT INTO record_exports (id, subject_id, content_hash, record_count, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).bind(id, subject, contentHash, recordCount, createdAt).run();
+    return json(request, env, { id, contentHash, recordCount, createdAt }, 201);
+  }
+
+  if (path === "cases" && request.method === "POST") {
+    const input = z
+      .object({
+        receipt: z.string().uuid(),
+        cycleId: z.string().uuid(),
+        cropStage: z.string().trim().min(1).max(80),
+        season: z.string().trim().min(1).max(80),
+        consent: z.literal(true),
+      })
+      .parse(await body(request));
+    const receipt = await env.DB.prepare(
+      `SELECT uid_hash, diagnosis_json, expires_at FROM receipts WHERE id = ?`,
+    )
+      .bind(input.receipt)
+      .first<{ uid_hash: string; diagnosis_json: string; expires_at: number }>();
+    if (!receipt || receipt.uid_hash !== (await sha256(uid)) || receipt.expires_at < Date.now())
+      throw new ApiError(400, "Diagnosis authorization expired.");
+    const cycle = await env.DB.prepare(
+      `SELECT c.id, c.crop_code, p.district, p.coarse_cell
+       FROM crop_cycles c JOIN farm_plots p ON p.id = c.plot_id
+       WHERE c.id = ? AND c.subject_id = ?`,
+    )
+      .bind(input.cycleId, subject)
+      .first<{ id: string; crop_code: string; district: string; coarse_cell: string | null }>();
+    if (!cycle) throw new ApiError(404, "Crop cycle not found.");
+    const diagnosis = JSON.parse(receipt.diagnosis_json) as Diagnosis;
+    const id = crypto.randomUUID();
+    const reference = `AGM-${new Date().getUTCFullYear().toString().slice(-2)}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO crop_health_cases
+       (id, reference, subject_id, cycle_id, crop_code, disease_code, disease_name,
+        symptoms_json, confidence, confidence_band, district, coarse_cell, crop_stage,
+        season, status, origin, consent_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', 'live', ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        reference,
+        subject,
+        input.cycleId,
+        diagnosis.crop || cycle.crop_code,
+        diagnosis.diseaseCode,
+        diagnosis.name,
+        JSON.stringify(diagnosis.evidence),
+        diagnosis.confidence,
+        confidenceBand(diagnosis.confidence),
+        cycle.district,
+        cycle.coarse_cell,
+        input.cropStage,
+        input.season,
+        PHASE2_CONSENT_VERSION,
+        now,
+        now,
+      )
+      .run();
+    return json(request, env, { id, reference, status: "pending_review" }, 201);
+  }
+
+  if (path === "cases" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT id, reference, cycle_id, crop_code, disease_code, disease_name,
+              symptoms_json, confidence, confidence_band, district, coarse_cell,
+              crop_stage, season, status, origin, consent_version, created_at, updated_at
+       FROM crop_health_cases WHERE subject_id = ? ORDER BY updated_at DESC`,
+    ).bind(subject).all<Record<string, string | number | null>>();
+    return json(request, env, {
+      cases: rows.results.map((row) => ({
+        id: row.id,
+        reference: row.reference,
+        cycleId: row.cycle_id,
+        cropCode: row.crop_code,
+        diseaseCode: row.disease_code,
+        diseaseName: row.disease_name,
+        symptoms: JSON.parse(String(row.symptoms_json)),
+        confidence: row.confidence,
+        confidenceBand: row.confidence_band,
+        district: row.district,
+        coarseCell: row.coarse_cell || undefined,
+        cropStage: row.crop_stage,
+        season: row.season,
+        status: row.status,
+        origin: row.origin,
+        consentVersion: row.consent_version,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    });
+  }
+
+  const matchPath = path.match(/^cases\/([0-9a-f-]+)\/matches$/);
+  if (matchPath && request.method === "GET") {
+    const targetRow = await env.DB.prepare("SELECT * FROM crop_health_cases WHERE id = ? AND subject_id = ?")
+      .bind(matchPath[1], subject).first<Record<string, string | number | null>>();
+    if (!targetRow) throw new ApiError(404, "Case not found.");
+    const candidateRows = await env.DB.prepare(
+      `SELECT * FROM crop_health_cases
+       WHERE status = 'closed' AND origin = 'live' AND crop_code = ?
+       ORDER BY updated_at DESC LIMIT 100`,
+    ).bind(targetRow.crop_code).all<Record<string, string | number | null>>();
+    const toCase = (row: Record<string, string | number | null>): CropHealthCase => ({
+      id: String(row.id), reference: String(row.reference), cycleId: String(row.cycle_id),
+      cropCode: String(row.crop_code), diseaseCode: String(row.disease_code), diseaseName: String(row.disease_name),
+      symptoms: JSON.parse(String(row.symptoms_json)), confidence: Number(row.confidence),
+      confidenceBand: row.confidence_band as CropHealthCase["confidenceBand"], district: String(row.district),
+      coarseCell: row.coarse_cell ? String(row.coarse_cell) : undefined, cropStage: String(row.crop_stage),
+      season: String(row.season), status: row.status as CropHealthCase["status"], origin: row.origin as CropHealthCase["origin"],
+      consentVersion: PHASE2_CONSENT_VERSION, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
+    });
+    return json(request, env, { matches: matchCases(toCase(targetRow), candidateRows.results.map(toCase)) });
+  }
+
+  const outcomePath = path.match(/^cases\/([0-9a-f-]+)\/outcomes$/);
+  if (outcomePath && request.method === "POST") {
+    const input = z.object({
+      intervalDays: z.union([z.literal(3), z.literal(7)]),
+      result: z.enum(["resolved", "improved", "unchanged", "worse", "unable"]),
+      note: z.string().trim().max(500).optional().default(""),
+    }).parse(await body(request));
+    const owned = await env.DB.prepare("SELECT id FROM crop_health_cases WHERE id = ? AND subject_id = ?")
+      .bind(outcomePath[1], subject).first();
+    if (!owned) throw new ApiError(404, "Case not found.");
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO case_outcomes (id, case_id, subject_id, interval_days, result, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(case_id, interval_days) DO UPDATE SET result = excluded.result, note = excluded.note, created_at = excluded.created_at`,
+      ).bind(id, outcomePath[1], subject, input.intervalDays, input.result, input.note, now),
+      env.DB.prepare("UPDATE crop_health_cases SET status = ?, updated_at = ? WHERE id = ? AND subject_id = ?")
+        .bind(input.intervalDays === 7 ? "closed" : "follow_up_due", now, outcomePath[1], subject),
+    ]);
+    return json(request, env, { ok: true, escalate: input.result === "worse" });
+  }
+
+  if (path === "expert/cases" && request.method === "GET") {
+    const reviewerHashes = (env.REVIEWER_UID_HASHES || "").split(",").map((value) => value.trim()).filter(Boolean);
+    if (!reviewerHashes.includes(await sha256(uid))) throw new ApiError(403, "Reviewer access required.");
+    const rows = await env.DB.prepare(
+      `SELECT id, reference, crop_code, disease_code, disease_name, symptoms_json,
+              confidence, confidence_band, district, crop_stage, season, status, origin, created_at
+       FROM crop_health_cases WHERE status IN ('pending_review', 'follow_up_due')
+       ORDER BY created_at ASC LIMIT 100`,
+    ).all();
+    return json(request, env, { cases: rows.results });
+  }
+
+  const reviewPath = path.match(/^expert\/cases\/([0-9a-f-]+)\/review$/);
+  if (reviewPath && request.method === "POST") {
+    const reviewerHashes = (env.REVIEWER_UID_HASHES || "").split(",").map((value) => value.trim()).filter(Boolean);
+    const reviewerId = await sha256(uid);
+    if (!reviewerHashes.includes(reviewerId)) throw new ApiError(403, "Reviewer access required.");
+    const input = z.object({
+      decision: z.enum(["approved", "changed", "undetermined"]),
+      remedy: z.object({
+        summary: z.string().trim().min(1).max(1000),
+        monitoring: z.array(z.string().trim().min(1).max(300)).max(8),
+        nonChemical: z.array(z.string().trim().min(1).max(300)).max(8),
+      }),
+      sources: z.array(z.string().url()).min(1).max(8),
+      synthetic: z.boolean().default(false),
+    }).parse(await body(request));
+    const exists = await env.DB.prepare("SELECT id FROM crop_health_cases WHERE id = ?")
+      .bind(reviewPath[1]).first();
+    if (!exists) throw new ApiError(404, "Case not found.");
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO case_reviews (id, case_id, reviewer_id, decision, remedy_json, sources_json, synthetic, reviewed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), reviewPath[1], reviewerId, input.decision, JSON.stringify(input.remedy), JSON.stringify(input.sources), input.synthetic ? 1 : 0, now),
+      env.DB.prepare("UPDATE crop_health_cases SET status = ?, updated_at = ? WHERE id = ?")
+        .bind(input.decision === "undetermined" ? "undetermined" : "reviewed", now, reviewPath[1]),
+    ]);
+    return json(request, env, { ok: true });
+  }
 
   if (request.method === "POST" && path === "location/resolve") {
     const position = positionSchema.parse(await body(request));
