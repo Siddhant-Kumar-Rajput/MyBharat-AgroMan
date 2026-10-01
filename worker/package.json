@@ -6,8 +6,8 @@
     "build": "tsc --noEmit",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:local": "wrangler d1 migrations apply agroman --local",
-    "db:remote": "wrangler d1 migrations apply agroman --remote"
+    "db:local": "wrangler d1 migrations apply mybharat-agroman --local",
+    "db:remote": "wrangler d1 migrations apply mybharat-agroman --remote"
   },
   "dependencies": {
     "jose": "^6.2.12",
