@@ -1,6 +1,6 @@
 # AgroMan
 
-Phase 1 agricultural advisory PWA. The mobile-first frontend uses React and TypeScript, Firebase Anonymous Authentication and Hosting. Its protected API runs on Cloudflare Workers with D1, Workers AI and Gemini. Earth Engine supplies operator-reviewed regional context exports.
+Phase 2 agricultural record and advisory PWA, extended from the frozen Phase 1 baseline. The frontend uses React and TypeScript, Firebase Anonymous/Phone Authentication and Hosting. Its protected API runs on Cloudflare Workers with D1, Workers AI and Gemini. See [the reconciled Phase 2 plan](docs/PHASE2_PLAN.md) for identity roles, original-spec coverage, delivery order and claim boundaries.
 
 ## Run locally
 
@@ -38,12 +38,17 @@ npm run dev -w worker
 - Browser-native speech first, Sarvam Bulbul v3 neural speech for ten Indian
   languages plus English, and an on-device eSpeak fallback.
 - PWA shell and cached local conversations; new advice needs network access.
+- Phase 2 domain and D1 schemas for phone-verified profiles, multiple plots,
+  crop cycles, activities, ledger entries, derived crop-health cases, outcomes,
+  exports and reviewer decisions.
+- Local farmer-record UI with JSON/CSV/print exports and labelled synthetic case
+  retrieval/reviewer demonstrations.
 
 ## Activation requirements and known limits
 
 Read [docs/SETUP.md](docs/SETUP.md) for the completed activation record and remaining release hardening.
 
-The live Phase 1 path is deployed at `https://agroman-siddhant-rajput.web.app`: Firebase Anonymous Auth, the Cloudflare Worker/D1 API, six reviewed Earth Engine district records and Gemini advisory requests have passed live smoke tests. App Check remains deliberately disabled during staging and is a release-hardening task.
+The isolated Phase 2 staging path is deployed at `https://mybharat-agroman.web.app` with API `https://mybharat-agroman-api.agroman.workers.dev`. Anonymous guest authentication and service health are verified. Phone OTP reached the Firebase reCAPTCHA flow but still requires lifecycle/network repair before it can be called validated. The new D1 database is migrated but does not yet contain the reviewed district context and boundary imports from Phase 1.
 
 The pilot registry currently contains **six districts**: Ludhiana, Amritsar, Lucknow, Varanasi, Pune and Nashik. This is representative coverage of three states, not full-state coverage. Expanding the registry and verifying district boundary aliases remains data work.
 
@@ -51,7 +56,10 @@ All 22 scheduled Indian languages plus English are selectable. Live UI translati
 
 Community Watch plots aggregate signals by centroid inside a reviewed district boundary. The boundary is contextual rather than a turn-by-turn navigation map, and the optional example preview is visibly labelled synthetic. Raw reports and installation identifiers are never returned to the browser in live mode. Confidence is an uncalibrated AI score, not diagnostic certainty; outbreak clusters are unverified signals.
 
-No current-weather integration, curated crop evidence library, NDVI dashboard, Agmarknet nudge or live camera stream is included yet. No Phase 2 identity or farm records are included.
+No current-weather integration, curated crop evidence library, NDVI dashboard,
+Agmarknet nudge, export-demand pipeline or live camera stream is included yet.
+Google sign-in and the new visitor/guest/farmer landing flow are planned but not
+implemented. Persistent record APIs require a phone-verified Firebase token.
 
 ## Repository layout
 
