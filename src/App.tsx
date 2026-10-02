@@ -62,13 +62,16 @@ import { DistrictMap } from "./components/DistrictMap";
 import { FarmRecords } from "./components/FarmRecords";
 import { ExpertReview } from "./components/ExpertReview";
 import { EntryGateway } from "./components/EntryGateway";
+import { FarmerDashboard } from "./components/FarmerDashboard";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert";
 type EntryMode = "visitor" | "guest" | "farmer";
 const photo =
   "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=2000&q=85";
 export default function App() {
-  const [page, setPage] = useState<Page>("home");
+  const [page, setPage] = useState<Page>(() =>
+    sessionStorage.getItem("agroman-entry-mode") === "guest" ? "advisor" : "home",
+  );
   const [entryMode, setEntryMode] = useState<EntryMode>(() => {
     const stored = sessionStorage.getItem("agroman-entry-mode");
     return stored === "guest" || stored === "farmer" ? stored : "visitor";
@@ -307,23 +310,17 @@ export default function App() {
     if (!demo) await currentUser();
     sessionStorage.setItem("agroman-entry-mode", "guest");
     setEntryMode("guest");
-    setPage("home");
-  }
-  function enterWithPhone() {
-    sessionStorage.setItem("agroman-entry-mode", "farmer");
-    setPhoneIntent("signin");
-    setEntryMode("farmer");
-    setPage("records");
+    setPage("advisor");
   }
   async function enterWithGoogle() {
-    sessionStorage.setItem("agroman-entry-mode", "farmer");
     if (!demo) {
-      await beginGoogleAuth("signin");
-      return;
+      const user = await beginGoogleAuth("signin");
+      setAuthUser(user);
     }
+    sessionStorage.setItem("agroman-entry-mode", "farmer");
     setPhoneIntent("link");
     setEntryMode("farmer");
-    setPage("records");
+    setPage("home");
   }
   async function leaveExperience() {
     if (!demo) await signOutUser();
@@ -599,7 +596,6 @@ export default function App() {
         copy={copy}
         error={error}
         onGuest={enterGuest}
-        onPhone={enterWithPhone}
         onGoogle={enterWithGoogle}
         onError={setError}
         onDismissError={() => setError("")}
@@ -654,7 +650,7 @@ export default function App() {
           className={menu ? "nav-links open" : "nav-links"}
           aria-label={t("navigation")}
         >
-          {(["home", "advisor", "records", "community"] as Page[]).map((item) => (
+          {((entryMode === "guest" ? ["advisor", "community"] : ["home", "advisor", "records", "community"]) as Page[]).map((item) => (
             <button
               key={item}
               className={page === item ? "selected" : ""}
@@ -688,7 +684,7 @@ export default function App() {
           </button>
           <button className="identity-switch" onClick={() => void leaveExperience()} aria-label={t("switchAccount")}>
             <ShieldCheck size={15} />
-            {identityLabel}
+            {entryMode === "farmer" ? t("signOut") : t("exitGuest")}
           </button>
           <button className="nav-cta" onClick={() => go("advisor")}>
             {t("openAdvisor")}
@@ -724,7 +720,9 @@ export default function App() {
       )}
       <main id="content">
         {page === "home" ? (
-          <>
+          entryMode === "farmer" ? (
+            <FarmerDashboard copy={copy} locale={locale} user={authUser} onNavigate={go} onError={setError} />
+          ) : <>
             <section className="hero">
               <div className="hero-content">
                 <p className="eyebrow">
@@ -1160,12 +1158,12 @@ export default function App() {
                   <Download size={17} />
                   {t("download")}
                 </button>
-              ) : (
+              ) : entryMode === "farmer" ? (
                 <button className="secondary" onClick={() => go("authority")}>
                   {t("authority")}
                   <ArrowUpRight size={17} />
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="watch-toolbar">
               {locationSelector}

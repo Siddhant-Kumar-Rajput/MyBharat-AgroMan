@@ -120,7 +120,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
   const [harvestRecord, setHarvestRecord] = useState({ yieldAmount: "", yieldUnit: "quintal", occurredOn: today(), detail: "" });
   const [ledger, setLedger] = useState({ kind: "expense", category: "seed", amount: "", occurredOn: today(), note: "" });
 
-  const verified = demo || Boolean(user?.phoneNumber);
+  const verified = demo || Boolean(user && !user.isAnonymous);
   const activeCycle = state.cycles.find((item) => item.id === activeCycleId) ?? state.cycles[0];
   const activeLedger = state.ledger.filter((entry) => entry.cycleId === activeCycle?.id);
   const totals = summarizeLedger(activeLedger);
@@ -166,7 +166,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
     void currentUser()
       .then((value) => {
         setUser(value);
-        if (value.phoneNumber) return refresh();
+        if (!value.isAnonymous) return refresh();
         setLoaded(true);
       })
       .catch((error) => onError(error.message));

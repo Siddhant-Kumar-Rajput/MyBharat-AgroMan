@@ -5,24 +5,52 @@ async function enterAsGuest(page: Page) {
   await page.getByRole("button", { name: "Continue as guest", exact: true }).first().click();
 }
 
-test("landing separates guest access from phone-gated farmer records", async ({ page }) => {
+async function openNavigationItem(page: Page, name: string) {
+  const item = page.getByRole("button", { name, exact: true });
+  if (!(await item.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await item.click();
+}
+
+test("landing separates limited guest access from Google farmer sign-in", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Understand every season/ })).toBeVisible();
-  await expect(page.getByText("Phone verification is mandatory before any farmer profile or farm record is stored.")).toHaveCount(0);
-  await page.getByRole("button", { name: "Farmer login / sign up", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: /Continue with phone/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeVisible();
-  await expect(page.getByText("Phone verification is mandatory before any farmer profile or farm record is stored.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Continue with phone/ })).toHaveCount(0);
+  await enterAsGuest(page);
+  await expect(page.getByRole("heading", { name: "Let’s talk about your land." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Farm records", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Overview", exact: true })).toHaveCount(0);
+});
+
+test("farmer dashboard manages profile preview and signs out cleanly", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
+  await page.getByLabel("Farmer name (optional)").fill("Ananya Farmer");
+  await page.getByLabel("State").fill("Odisha");
+  await page.getByLabel("District").fill("Cuttack");
+  const encoded = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 24;
+    canvas.height = 24;
+    canvas.getContext("2d")!.fillRect(0, 0, 24, 24);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator('.profile-card input[type="file"]').setInputFiles({
+    name: "farmer.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(encoded, "base64"),
+  });
+  await expect(page.getByAltText("Farmer profile preview")).toBeVisible();
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Profile saved.");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /Understand every season/ })).toBeVisible();
 });
 
 test("photo consent contributes metadata without persisting photo data", async ({
   page,
 }) => {
   await enterAsGuest(page);
-  await page
-    .getByRole("button", { name: "Meet your farm advisor" })
-    .first()
-    .click();
   const encoded = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 32;
@@ -74,10 +102,6 @@ test("a thread stops accepting questions after eighteen turns", async ({
 }) => {
   test.setTimeout(60000);
   await enterAsGuest(page);
-  await page
-    .getByRole("button", { name: "Meet your farm advisor" })
-    .first()
-    .click();
   for (let i = 0; i < 18; i++) {
     await page.getByRole("textbox").fill(`Question ${i + 1}`);
     await page
@@ -98,29 +122,21 @@ test("a thread stops accepting questions after eighteen turns", async ({
 });
 test("advisory persists a conversation after reload", async ({ page }) => {
   await enterAsGuest(page);
-  await page
-    .getByRole("button", { name: "Meet your farm advisor" })
-    .first()
-    .click();
   await page.getByRole("textbox").fill("I harvested rice two weeks ago.");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(
     page.getByText("Demonstration response for Ludhiana"),
   ).toBeVisible();
   await page.reload();
-  await page
-    .getByRole("button", { name: "Meet your farm advisor" })
-    .first()
-    .click();
   await expect(
     page.getByText("Demonstration response for Ludhiana"),
   ).toBeVisible();
 });
-test("community and authority expose only labeled demo signals", async ({
+test("guest community view exposes only labeled aggregate demo signals", async ({
   page,
 }) => {
   await enterAsGuest(page);
-  await page.getByRole("button", { name: "Explore community watch" }).click();
+  await openNavigationItem(page, "Community watch");
   await expect(page.getByText("Synthetic demonstration reports")).toBeVisible();
   await expect(
     page.getByRole("img", {
@@ -131,10 +147,7 @@ test("community and authority expose only labeled demo signals", async ({
   await expect(
     page.getByText("Potential outbreak", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Authority view" }).click();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download incident summary" }).click();
-  expect((await download).suggestedFilename()).toBe("agroman-incidents.json");
+  await expect(page.getByRole("button", { name: "Authority view" })).toHaveCount(0);
 });
 test("language coverage is honest and layout fits the viewport", async ({
   page,
@@ -155,8 +168,10 @@ test("language coverage is honest and layout fits the viewport", async ({
 
 test("farmer can build and export a phase two farm record", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Farmer login / sign up", exact: true }).first().click();
-  await page.getByRole("button", { name: /Continue with phone/ }).click();
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: /Namaste/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  await openNavigationItem(page, "Farm records");
   await page.getByLabel("State").fill("Odisha");
   await page.getByLabel("District").fill("Cuttack");
   await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
@@ -243,10 +258,6 @@ test("Hindi read aloud loads the on-device fallback", async ({
   });
   await enterAsGuest(page);
   await page.getByLabel("Language", { exact: true }).selectOption("hi");
-  await page
-    .getByRole("button", { name: "Meet your farm advisor" })
-    .first()
-    .click();
   await page.getByRole("textbox").fill("मेरी फसल की देखभाल कैसे करूँ?");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(

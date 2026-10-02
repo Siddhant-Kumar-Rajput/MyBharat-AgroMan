@@ -237,6 +237,7 @@ async function authenticate(request: Request, env: Env) {
     return {
       uid: payload.sub,
       phoneVerified: typeof payload.phone_number === "string",
+      provider: (payload.firebase as { sign_in_provider?: string } | undefined)?.sign_in_provider ?? "unknown",
     };
   } catch {
     throw new ApiError(
@@ -589,8 +590,8 @@ async function route(request: Request, env: Env) {
   }
 
   const persistentPhase2Path = /^(profile|records|plots|cycles|events|ledger|exports|cases|expert)(\/|$)/.test(path);
-  if (persistentPhase2Path && !auth.phoneVerified)
-    throw new ApiError(403, "Verify your phone number to use persistent farm records.");
+  if (persistentPhase2Path && auth.provider === "anonymous")
+    throw new ApiError(403, "Sign in with Google to use persistent farm records.");
   const subject = persistentPhase2Path ? await subjectId(env, uid) : "";
 
   if (path === "profile" && request.method === "GET") {

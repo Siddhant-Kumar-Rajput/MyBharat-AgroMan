@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Globe2, LockKeyhole, ShieldCheck, Smartphone, Sprout, UserRound } from "lucide-react";
+import { ArrowUpRight, Globe2, ShieldCheck, Sprout, UserRound } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -11,15 +11,13 @@ type Props = {
   copy: Copy;
   error: string;
   onGuest: () => Promise<void>;
-  onPhone: () => void;
   onGoogle: () => Promise<void>;
   onError: (message: string) => void;
   onDismissError: () => void;
 };
 
-export function EntryGateway({ copy: t, error, onGuest, onPhone, onGoogle, onError, onDismissError }: Props) {
+export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDismissError }: Props) {
   const root = useRef<HTMLDivElement>(null);
-  const [authOpen, setAuthOpen] = useState(false);
   const [busy, setBusy] = useState<"guest" | "google" | "">("");
 
   useGSAP(
@@ -77,7 +75,7 @@ export function EntryGateway({ copy: t, error, onGuest, onPhone, onGoogle, onErr
     <div className="entry" ref={root}>
       <nav className="entry-nav" aria-label={t.navigation}>
         <div className="entry-brand"><img src="/mark.svg" alt="" /><span>MyBharat AgroMan</span></div>
-        <button className="entry-nav-action" onClick={() => setAuthOpen(true)}>{t.farmerLogin}<ArrowUpRight size={16} /></button>
+        <button className="entry-nav-action" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={16} /></button>
       </nav>
       {error && <div className="entry-error" role="alert"><span>{error}</span><button onClick={onDismissError}>{t.dismiss}</button></div>}
 
@@ -89,7 +87,7 @@ export function EntryGateway({ copy: t, error, onGuest, onPhone, onGoogle, onErr
             <p className="entry-lead">{t.entryCopy}</p>
             <div className="entry-actions">
               <button className="entry-primary" disabled={Boolean(busy)} onClick={() => void run("guest", onGuest)}>{t.continueGuest}<ArrowUpRight size={18} /></button>
-              <button className="entry-secondary" disabled={Boolean(busy)} onClick={() => setAuthOpen(true)}>{t.farmerLogin}</button>
+              <button className="entry-secondary google-entry" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}><span className="google-mark">G</span>{t.googleAccess}</button>
             </div>
             <p className="entry-consent"><ShieldCheck size={15} />{t.entryConsent}</p>
           </div>
@@ -108,8 +106,8 @@ export function EntryGateway({ copy: t, error, onGuest, onPhone, onGoogle, onErr
           </div>
           <div className="entry-bento">
             <article className="entry-path guest-path entry-proof-card"><UserRound /><h3>{t.continueGuest}</h3><p>{t.guestDescription}</p><button onClick={() => void run("guest", onGuest)} disabled={Boolean(busy)}>{t.enterGuest}<ArrowUpRight size={16} /></button></article>
-            <article className="entry-path farmer-path entry-proof-card"><Smartphone /><h3>{t.verifiedFarmerTitle}</h3><p>{t.farmerDescription}</p><button onClick={() => setAuthOpen(true)}>{t.chooseFarmerAccess}<ArrowUpRight size={16} /></button></article>
-            <article className="entry-proof-card"><LockKeyhole /><h3>{t.phoneRequiredTitle}</h3><p>{t.phoneRequiredCopy}</p></article>
+            <article className="entry-path farmer-path entry-proof-card"><span className="google-mark large">G</span><h3>{t.verifiedFarmerTitle}</h3><p>{t.farmerDescription}</p><button disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={16} /></button></article>
+            <article className="entry-proof-card"><ShieldCheck /><h3>{t.phoneRequiredTitle}</h3><p>{t.phoneRequiredCopy}</p></article>
             <article className="entry-proof-card"><Globe2 /><h3>{t.languageFirstTitle}</h3><p>{t.languageFirstCopy}</p></article>
             <article className="entry-proof-card"><ShieldCheck /><h3>{t.privacyFirstTitle}</h3><p>{t.privacyFirstCopy}</p></article>
           </div>
@@ -121,24 +119,12 @@ export function EntryGateway({ copy: t, error, onGuest, onPhone, onGoogle, onErr
 
         <section className="entry-action">
           <h2>{t.entryActionTitle}</h2>
-          <div className="entry-actions"><button className="entry-primary light" onClick={() => setAuthOpen(true)}>{t.farmerLogin}<ArrowUpRight size={18} /></button><button className="entry-secondary light-outline" onClick={() => void run("guest", onGuest)}>{t.continueGuest}</button></div>
+          <div className="entry-actions"><button className="entry-primary light" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={18} /></button><button className="entry-secondary light-outline" disabled={Boolean(busy)} onClick={() => void run("guest", onGuest)}>{t.continueGuest}</button></div>
         </section>
       </main>
 
       <footer className="entry-footer"><span>MyBharat AgroMan</span><p>{t.footer}</p><span>{t.entryFooter}</span></footer>
 
-      {authOpen && (
-        <div className="entry-auth-backdrop" role="presentation" onClick={() => !busy && setAuthOpen(false)}>
-          <section className="entry-auth" role="dialog" aria-modal="true" aria-labelledby="entry-auth-title" onClick={(event) => event.stopPropagation()}>
-            <button className="entry-auth-back" onClick={() => setAuthOpen(false)}><ArrowLeft size={16} />{t.backToIntro}</button>
-            <h2 id="entry-auth-title">{t.chooseFarmerAccess}</h2>
-            <p>{t.farmerAccessCopy}</p>
-            <button className="entry-auth-option" onClick={onPhone}><Smartphone /><span><strong>{t.phoneAccess}</strong><small>{t.phoneAccessCopy}</small></span><ArrowUpRight /></button>
-            <button className="entry-auth-option" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}><span className="google-mark">G</span><span><strong>{t.googleAccess}</strong><small>{t.googleAccessCopy}</small></span><ArrowUpRight /></button>
-            <p className="entry-auth-note"><LockKeyhole size={14} />{t.phonePersistenceGate}</p>
-          </section>
-        </div>
-      )}
     </div>
   );
 }
