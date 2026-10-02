@@ -194,6 +194,19 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await expect(page.getByText(/AGM-DEMO-/)).toBeVisible();
   await expect(page.getByText("155333 · Odisha")).toBeVisible();
 
+  await page.getByRole("button", { name: "Expert review" }).click();
+  await expect(page.getByText("AI-assisted pre-review")).toBeVisible();
+  await expect(page.getByText("Priority review")).toBeVisible();
+  await page.getByLabel("Reviewer remedy summary").fill("Review the affected plants and continue field monitoring.");
+  await page.getByLabel("Monitoring steps").fill("Check spread daily");
+  await page.getByLabel("Non-chemical steps").fill("Separate badly affected plant material");
+  await page.getByLabel("Authoritative source URL").fill("https://icar.gov.in/");
+  await page.getByRole("button", { name: "Approve sourced guidance" }).click();
+  await expect(page.getByText("No cases are waiting for review.")).toBeVisible();
+  const farmRecordsNav = page.getByRole("button", { name: "Farm records", exact: true });
+  if (!(await farmRecordsNav.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await farmRecordsNav.click();
+
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download JSON" }).click();
   expect((await download).suggestedFilename()).toBe("agroman-farm-record.json");

@@ -4,6 +4,7 @@ import {
   adviceSchema,
   answerSchema,
   confidenceBand,
+  triageCase,
   clusterReports,
   cropCycleInputSchema,
   cycleEventInputSchema,
@@ -819,12 +820,15 @@ async function route(request: Request, env: Env) {
     const id = crypto.randomUUID();
     const reference = `AGM-${new Date().getUTCFullYear().toString().slice(-2)}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
     const now = Date.now();
+    const triage = triageCase({ confidence: diagnosis.confidence, symptoms: diagnosis.evidence, status: "pending_review" }, now);
     await env.DB.prepare(
       `INSERT INTO crop_health_cases
        (id, reference, subject_id, cycle_id, crop_code, disease_code, disease_name,
         symptoms_json, confidence, confidence_band, district, coarse_cell, crop_stage,
-        season, status, origin, consent_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', 'live', ?, ?, ?)`,
+        season, status, origin, consent_version, triage_priority, triage_route,
+        triage_reasons_json, interim_actions_json, triage_policy_version, triaged_at,
+        created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         id,
@@ -842,6 +846,12 @@ async function route(request: Request, env: Env) {
         input.cropStage,
         input.season,
         PHASE2_CONSENT_VERSION,
+        triage.priority,
+        triage.route,
+        JSON.stringify(triage.reasons),
+        JSON.stringify(triage.interimActions),
+        triage.policyVersion,
+        triage.triagedAt,
         now,
         now,
       )
@@ -853,7 +863,9 @@ async function route(request: Request, env: Env) {
     const rows = await env.DB.prepare(
       `SELECT id, reference, cycle_id, crop_code, disease_code, disease_name,
               symptoms_json, confidence, confidence_band, district, coarse_cell,
-              crop_stage, season, status, origin, consent_version, created_at, updated_at
+              crop_stage, season, status, origin, consent_version, triage_priority,
+              triage_route, triage_reasons_json, interim_actions_json,
+              triage_policy_version, triaged_at, created_at, updated_at
        FROM crop_health_cases WHERE subject_id = ? ORDER BY updated_at DESC`,
     ).bind(subject).all<Record<string, string | number | null>>();
     return json(request, env, {
@@ -874,6 +886,14 @@ async function route(request: Request, env: Env) {
         status: row.status,
         origin: row.origin,
         consentVersion: row.consent_version,
+        aiTriage: {
+          priority: row.triage_priority,
+          route: row.triage_route,
+          reasons: JSON.parse(String(row.triage_reasons_json || "[]")),
+          interimActions: JSON.parse(String(row.interim_actions_json || "[]")),
+          policyVersion: row.triage_policy_version,
+          triagedAt: row.triaged_at || row.created_at,
+        },
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       })),
@@ -909,19 +929,24 @@ async function route(request: Request, env: Env) {
       result: z.enum(["resolved", "improved", "unchanged", "worse", "unable"]),
       note: z.string().trim().max(500).optional().default(""),
     }).parse(await body(request));
-    const owned = await env.DB.prepare("SELECT id FROM crop_health_cases WHERE id = ? AND subject_id = ?")
-      .bind(outcomePath[1], subject).first();
+    const owned = await env.DB.prepare("SELECT id, confidence, symptoms_json FROM crop_health_cases WHERE id = ? AND subject_id = ?")
+      .bind(outcomePath[1], subject).first<{ id: string; confidence: number; symptoms_json: string }>();
     if (!owned) throw new ApiError(404, "Case not found.");
     const id = crypto.randomUUID();
     const now = Date.now();
+    const nextStatus = input.intervalDays === 7 ? "closed" : "follow_up_due";
+    const nextTriage = triageCase({ confidence: Number(owned.confidence), symptoms: JSON.parse(owned.symptoms_json), status: nextStatus }, now);
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO case_outcomes (id, case_id, subject_id, interval_days, result, note, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(case_id, interval_days) DO UPDATE SET result = excluded.result, note = excluded.note, created_at = excluded.created_at`,
       ).bind(id, outcomePath[1], subject, input.intervalDays, input.result, input.note, now),
-      env.DB.prepare("UPDATE crop_health_cases SET status = ?, updated_at = ? WHERE id = ? AND subject_id = ?")
-        .bind(input.intervalDays === 7 ? "closed" : "follow_up_due", now, outcomePath[1], subject),
+      env.DB.prepare(
+        `UPDATE crop_health_cases SET status = ?, triage_priority = ?, triage_route = ?,
+         triage_reasons_json = ?, interim_actions_json = ?, triage_policy_version = ?,
+         triaged_at = ?, updated_at = ? WHERE id = ? AND subject_id = ?`,
+      ).bind(nextStatus, nextTriage.priority, nextTriage.route, JSON.stringify(nextTriage.reasons), JSON.stringify(nextTriage.interimActions), nextTriage.policyVersion, nextTriage.triagedAt, now, outcomePath[1], subject),
     ]);
     return json(request, env, { ok: true, escalate: input.result === "worse" });
   }
@@ -930,12 +955,42 @@ async function route(request: Request, env: Env) {
     const reviewerHashes = (env.REVIEWER_UID_HASHES || "").split(",").map((value) => value.trim()).filter(Boolean);
     if (!reviewerHashes.includes(await sha256(uid))) throw new ApiError(403, "Reviewer access required.");
     const rows = await env.DB.prepare(
-      `SELECT id, reference, crop_code, disease_code, disease_name, symptoms_json,
-              confidence, confidence_band, district, crop_stage, season, status, origin, created_at
+      `SELECT id, reference, cycle_id, crop_code, disease_code, disease_name, symptoms_json,
+              confidence, confidence_band, district, coarse_cell, crop_stage, season, status,
+              origin, consent_version, triage_priority, triage_route, triage_reasons_json,
+              interim_actions_json, triage_policy_version, triaged_at, created_at, updated_at
        FROM crop_health_cases WHERE status IN ('pending_review', 'follow_up_due')
-       ORDER BY created_at ASC LIMIT 100`,
-    ).all();
-    return json(request, env, { cases: rows.results });
+       ORDER BY CASE triage_priority WHEN 'urgent' THEN 0 WHEN 'priority' THEN 1 ELSE 2 END,
+                created_at ASC LIMIT 100`,
+    ).all<Record<string, string | number | null>>();
+    return json(request, env, { cases: rows.results.map((row) => ({
+      id: row.id,
+      reference: row.reference,
+      cycleId: row.cycle_id,
+      cropCode: row.crop_code,
+      diseaseCode: row.disease_code,
+      diseaseName: row.disease_name,
+      symptoms: JSON.parse(String(row.symptoms_json)),
+      confidence: row.confidence,
+      confidenceBand: row.confidence_band,
+      district: row.district,
+      coarseCell: row.coarse_cell || undefined,
+      cropStage: row.crop_stage,
+      season: row.season,
+      status: row.status,
+      origin: row.origin,
+      consentVersion: row.consent_version,
+      aiTriage: {
+        priority: row.triage_priority,
+        route: row.triage_route,
+        reasons: JSON.parse(String(row.triage_reasons_json || "[]")),
+        interimActions: JSON.parse(String(row.interim_actions_json || "[]")),
+        policyVersion: row.triage_policy_version,
+        triagedAt: row.triaged_at || row.created_at,
+      },
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })) });
   }
 
   const reviewPath = path.match(/^expert\/cases\/([0-9a-f-]+)\/review$/);

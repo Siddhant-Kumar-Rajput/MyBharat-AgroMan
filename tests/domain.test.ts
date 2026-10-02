@@ -12,6 +12,7 @@ import {
   profileInputSchema,
   matchCases,
   summarizeLedger,
+  triageCase,
   type CropHealthCase,
   type LedgerEntry,
   type Report,
@@ -210,6 +211,24 @@ describe("phase two farm records", () => {
     expect(cycleEventInputSchema.safeParse({ ...base, type: "input" }).success).toBe(false);
     expect(cycleEventInputSchema.safeParse({ ...base, type: "harvest", yieldAmount: 12, yieldUnit: "quintal" }).success).toBe(true);
     expect(cycleEventInputSchema.safeParse({ ...base, type: "harvest" }).success).toBe(false);
+  });
+
+  it("fast-tracks strong evidence but escalates uncertainty and follow-up", () => {
+    expect(triageCase({ confidence: 0.94, symptoms: ["a", "b"], status: "pending_review" })).toMatchObject({
+      priority: "standard",
+      route: "standard_review",
+      reasons: ["high_model_signal"],
+    });
+    expect(triageCase({ confidence: 0.84, symptoms: ["a"], status: "pending_review" })).toMatchObject({
+      priority: "priority",
+      route: "priority_review",
+      reasons: ["moderate_model_signal", "limited_visible_evidence"],
+    });
+    expect(triageCase({ confidence: 0.94, symptoms: ["a", "b"], status: "follow_up_due" })).toMatchObject({
+      priority: "urgent",
+      route: "urgent_review",
+      reasons: ["high_model_signal", "follow_up_due"],
+    });
   });
 
   it("retrieves only sufficiently similar closed cases", () => {

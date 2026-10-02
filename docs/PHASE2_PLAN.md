@@ -82,6 +82,7 @@ The reviewed Phase 1 snapshot is now imported into the Phase 2 D1 environment: s
 - Official helpline escalation: national Kisan Call Centre `1800-180-1551`; Odisha `155333` only when the selected state is Odisha.
 - Request IDs connect assessment, review, remedy and outcome.
 - Similar-case retrieval uses reviewed/closed cases before any model-training proposal.
+- AI-assisted pre-review uses a versioned safety policy to route standard, priority and urgent cases. It may show fixed low-risk interim steps, but confidence alone never authorizes a treatment or chemical recommendation.
 - Synthetic competition cases remain visibly labelled and never imply expert approval.
 - In-app follow-up reminders precede push notifications.
 - Farmer ledger remains a lightweight self-reported record, not audited accounting.
@@ -104,7 +105,7 @@ The reviewed Phase 1 snapshot is now imported into the Phase 2 D1 environment: s
 - Completed: structured farmer-reported input, harvest and yield events persist across sessions.
 - Connect real derived crop-health assessments to crop cycles.
 - Add record correction history and improved PDF presentation.
-- Add in-app follow-up queue and reviewer-sourced remedies.
+- In progress: AI-assisted triage and a structured reviewer form now require authoritative sources; farmer delivery and correction history remain.
 
 ### P2 — predictive personalization
 

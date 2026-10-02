@@ -277,6 +277,19 @@ export function confidenceBand(score: number): ConfidenceBand {
 }
 
 export type CaseStatus = "ai_assessed" | "pending_review" | "reviewed" | "undetermined" | "follow_up_due" | "closed";
+export const AI_TRIAGE_POLICY_VERSION = "2026-10-02.1";
+export type ReviewPriority = "standard" | "priority" | "urgent";
+export type ReviewRoute = "standard_review" | "priority_review" | "urgent_review";
+export type TriageReason = "high_model_signal" | "moderate_model_signal" | "low_model_signal" | "limited_visible_evidence" | "follow_up_due";
+export type InterimAction = "monitor_changes" | "avoid_unverified_treatment" | "capture_more_evidence" | "contact_official_helpline";
+export type AiTriage = {
+  priority: ReviewPriority;
+  route: ReviewRoute;
+  reasons: TriageReason[];
+  interimActions: InterimAction[];
+  policyVersion: typeof AI_TRIAGE_POLICY_VERSION;
+  triagedAt: number;
+};
 export type CropHealthCase = {
   id: string;
   reference: string;
@@ -294,9 +307,47 @@ export type CropHealthCase = {
   status: CaseStatus;
   origin: "synthetic" | "live";
   consentVersion: typeof PHASE2_CONSENT_VERSION;
+  aiTriage?: AiTriage;
   createdAt: number;
   updatedAt: number;
 };
+export function triageCase(
+  item: Pick<CropHealthCase, "confidence" | "symptoms" | "status">,
+  triagedAt = Date.now(),
+): AiTriage {
+  let priority: ReviewPriority = "standard";
+  const reasons: TriageReason[] = [];
+  const interimActions: InterimAction[] = ["monitor_changes", "avoid_unverified_treatment"];
+
+  if (item.confidence < 0.75) {
+    priority = "urgent";
+    reasons.push("low_model_signal");
+  } else if (item.confidence < 0.9) {
+    priority = "priority";
+    reasons.push("moderate_model_signal");
+  } else {
+    reasons.push("high_model_signal");
+  }
+  if (item.symptoms.length < 2) {
+    if (priority === "standard") priority = "priority";
+    reasons.push("limited_visible_evidence");
+    interimActions.push("capture_more_evidence");
+  }
+  if (item.status === "follow_up_due") {
+    priority = "urgent";
+    reasons.push("follow_up_due");
+  }
+  if (priority === "urgent") interimActions.push("contact_official_helpline");
+
+  return {
+    priority,
+    route: priority === "urgent" ? "urgent_review" : priority === "priority" ? "priority_review" : "standard_review",
+    reasons,
+    interimActions,
+    policyVersion: AI_TRIAGE_POLICY_VERSION,
+    triagedAt,
+  };
+}
 export type CaseOutcome = {
   id: string;
   caseId: string;

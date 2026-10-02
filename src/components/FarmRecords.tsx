@@ -20,6 +20,7 @@ import {
   matchCases,
   priorityCrops,
   summarizeLedger,
+  triageCase,
   type CropCycleInput,
   type CropHealthCase,
   type Phase2State,
@@ -62,6 +63,12 @@ const reasonKey: Record<string, keyof Copy> = {
   "same season": "sameSeason",
   "same district": "sameDistrict",
   "nearby coarse area": "nearbyCoarseArea",
+};
+const interimActionKey: Record<string, keyof Copy> = {
+  monitor_changes: "monitorChanges",
+  avoid_unverified_treatment: "avoidUnverifiedTreatment",
+  capture_more_evidence: "captureMoreEvidence",
+  contact_official_helpline: "contactOfficialHelpline",
 };
 const inputClassKey: Record<string, keyof Copy> = {
   seed: "seed",
@@ -376,6 +383,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
       createdAt: now,
       updatedAt: now,
     };
+    created.aiTriage = triageCase(created, now);
     void action(() => commit({ ...state, cases: [created, ...state.cases] }));
   }
 
@@ -517,7 +525,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
         <article className="record-panel case-panel">
           <div className="panel-title"><ShieldCheck /><div><h2>{t.healthCase}</h2><p>{t.confidenceExplanation}</p></div></div>
           {!activeCase ? <button className="secondary" disabled={!activeCycle} onClick={createExampleCase}>{t.createExampleCase}</button> : <>
-            <div className="case-summary"><span className="case-status">{t.synthetic}</span><h3>{activeCase.diseaseName}</h3><p><strong>{t.caseReference}:</strong> {activeCase.reference}</p><div className="confidence-row"><strong>{t.aiConfidence}</strong><span>{t.confidenceModerate} · {Math.round(activeCase.confidence * 100)}%</span></div><small>{t.confidenceExplanation}</small><p>{activeCase.status === "pending_review" ? t.pendingReview : t.reviewed}</p></div>
+            <div className="case-summary"><span className="case-status">{t.synthetic}</span><h3>{activeCase.diseaseName}</h3><p><strong>{t.caseReference}:</strong> {activeCase.reference}</p><div className="confidence-row"><strong>{t.aiConfidence}</strong><span>{t.confidenceModerate} · {Math.round(activeCase.confidence * 100)}%</span></div><small>{t.confidenceExplanation}</small><p>{activeCase.status === "pending_review" ? t.pendingReview : t.reviewed}</p>{activeCase.aiTriage && <div className="interim-guidance"><strong>{t.whileWaiting}</strong><ul>{activeCase.aiTriage.interimActions.map((action) => <li key={action}>{t[interimActionKey[action]]}</li>)}</ul><small>{t.interimDisclaimer}</small></div>}</div>
             <div className="matches"><h3>{t.similarCases}</h3>{matches.map((match) => <div key={match.caseId}><CheckCircle2 size={16} /><span><strong>{match.reference}</strong><small>{match.score}% · {match.reasons.map((reason) => reasonKey[reason] ? t[reasonKey[reason]] : reason).join(", ")}</small></span></div>)}</div>
             <div className="outcome-actions"><button className="text-button" onClick={() => recordOutcome(3, "improved")}>{t.outcome3}: {t.improved}</button><button className="text-button" onClick={() => recordOutcome(7, "resolved")}>{t.outcome7}: {t.resolved}</button></div>
           </>}
