@@ -38,6 +38,7 @@ export const english = {
   verifiedFarmer: "Verified farmer",
   switchAccount: "Sign out",
   signOut: "Sign out",
+  signOutError: "The local session was closed, but Firebase sign-out could not be confirmed.",
   exitGuest: "Exit guest mode",
   farmerDashboard: "Farmer dashboard",
   dashboardWelcome: "Namaste, {name}.",

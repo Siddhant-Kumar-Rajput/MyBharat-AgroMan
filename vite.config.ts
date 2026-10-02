@@ -36,7 +36,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         globIgnores: ["espeak/**"],
-        navigateFallbackDenylist: [/^\/v1\//],
+        navigateFallbackDenylist: [/^\/v1\//, /^\/__\//],
       },
     }),
   ],

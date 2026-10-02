@@ -322,14 +322,17 @@ export default function App() {
     setEntryMode("farmer");
     setPage("home");
   }
-  async function leaveExperience() {
-    if (!demo) await signOutUser();
+  function leaveExperience() {
     sessionStorage.removeItem("agroman-entry-mode");
     setAuthUser(null);
     setEntryMode("visitor");
     setPage("home");
     setError("");
     window.scrollTo(0, 0);
+    if (!demo)
+      void signOutUser().catch(() =>
+        setError(t("signOutError")),
+      );
   }
   function startThread() {
     if (busy) return;
@@ -682,7 +685,7 @@ export default function App() {
           >
             <Menu />
           </button>
-          <button className="identity-switch" onClick={() => void leaveExperience()} aria-label={t("switchAccount")}>
+          <button className="identity-switch" onClick={leaveExperience} aria-label={t("switchAccount")}>
             <ShieldCheck size={15} />
             {entryMode === "farmer" ? t("signOut") : t("exitGuest")}
           </button>
