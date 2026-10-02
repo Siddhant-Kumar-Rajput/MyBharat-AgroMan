@@ -1237,7 +1237,7 @@ export default function App() {
         >
           GitHub <ExternalLink size={13} />
         </a>
-        <button className="footer-link" onClick={() => go("expert")}>{t("expert")}</button>
+        {entryMode === "farmer" && <button className="footer-link" onClick={() => go("expert")}>{t("expert")}</button>}
         <span>PHASE 2 / 2026</span>
       </footer>
       {consent && (
