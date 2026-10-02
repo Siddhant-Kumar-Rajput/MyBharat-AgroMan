@@ -2,12 +2,12 @@ import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
-  linkWithPopup,
+  linkWithRedirect,
   linkWithPhoneNumber,
   onAuthStateChanged,
   RecaptchaVerifier,
   signInWithPhoneNumber,
-  signInWithPopup,
+  signInWithRedirect,
   signInAnonymously,
   signOut,
   type Auth,
@@ -117,9 +117,11 @@ export async function beginGoogleAuth(intent: "link" | "signin" = "signin") {
   await auth.authStateReady();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  if (intent === "link" && auth.currentUser)
-    return (await linkWithPopup(auth.currentUser, provider)).user;
-  return (await signInWithPopup(auth, provider)).user;
+  if (intent === "link" && auth.currentUser) {
+    await linkWithRedirect(auth.currentUser, provider);
+    return;
+  }
+  await signInWithRedirect(auth, provider);
 }
 
 export async function signOutUser() {

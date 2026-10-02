@@ -316,11 +316,11 @@ export default function App() {
     setPage("records");
   }
   async function enterWithGoogle() {
-    if (!demo) {
-      const user = await beginGoogleAuth("signin");
-      setAuthUser(user);
-    }
     sessionStorage.setItem("agroman-entry-mode", "farmer");
+    if (!demo) {
+      await beginGoogleAuth("signin");
+      return;
+    }
     setPhoneIntent("link");
     setEntryMode("farmer");
     setPage("records");
