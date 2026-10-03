@@ -1,5 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("agroman-language-chosen", "yes"));
+});
+
 async function enterAsGuest(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Continue as guest", exact: true }).first().click();
@@ -18,7 +22,7 @@ test("landing separates limited guest access from Google farmer sign-in", async 
   await expect(page.getByRole("button", { name: /Continue with phone/ })).toHaveCount(0);
   await enterAsGuest(page);
   await expect(page.getByRole("heading", { name: "Let’s talk about your land." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Farm records", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "My Farm Diary", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Overview", exact: true })).toHaveCount(0);
 });
 
@@ -26,8 +30,8 @@ test("farmer dashboard manages profile preview and signs out cleanly", async ({ 
   await page.goto("/");
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
   await page.getByLabel("Farmer name (optional)").fill("Ananya Farmer");
-  await page.getByLabel("State").fill("Odisha");
-  await page.getByLabel("District").fill("Cuttack");
+  await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
+  await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Kataka");
   const encoded = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 24;
@@ -171,9 +175,9 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: /Namaste/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
-  await openNavigationItem(page, "Farm records");
-  await page.getByLabel("State").fill("Odisha");
-  await page.getByLabel("District").fill("Cuttack");
+  await openNavigationItem(page, "My Farm Diary");
+  await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
+  await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Kataka");
   await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
   await page.getByLabel("Most recent harvest date (optional)").fill("2026-05-20");
   await page.getByRole("button", { name: "Save profile" }).click();
@@ -218,7 +222,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByLabel("Authoritative source URL").fill("https://icar.gov.in/");
   await page.getByRole("button", { name: "Approve sourced guidance" }).click();
   await expect(page.getByText("No cases are waiting for review.")).toBeVisible();
-  const farmRecordsNav = page.getByRole("button", { name: "Farm records", exact: true });
+  const farmRecordsNav = page.getByRole("button", { name: "My Farm Diary", exact: true });
   if (!(await farmRecordsNav.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
   await farmRecordsNav.click();
 

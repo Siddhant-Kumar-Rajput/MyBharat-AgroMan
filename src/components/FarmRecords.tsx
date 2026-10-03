@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   BadgeIndianRupee,
   BookOpen,
@@ -26,15 +26,14 @@ import {
   type Phase2State,
   type ProfileInput,
 } from "../../shared/domain";
-import { beginPhoneAuth, currentUser, demo, resetPhoneVerifier } from "../lib/api";
+import { demo } from "../lib/api";
 import { deletePhase2Record, loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
-import type { ConfirmationResult, User } from "firebase/auth";
+import { LocationFields } from "./LocationFields";
 
 type Props = {
   copy: Copy;
   locale: string;
-  phoneIntent?: "link" | "signin";
   onError: (message: string) => void;
 };
 
@@ -100,17 +99,12 @@ function download(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: Props) {
+export function FarmRecords({ copy: t, locale, onError }: Props) {
   const [state, setState] = useState<Phase2State>(emptyState);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [phone, setPhone] = useState("+91");
-  const [code, setCode] = useState("");
-  const [confirmation, setConfirmation] = useState<ConfirmationResult>();
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [recordNotice, setRecordNotice] = useState("");
-  const recaptcha = useRef<HTMLDivElement>(null);
   const [activeCycleId, setActiveCycleId] = useState("");
   const [profile, setProfile] = useState({ displayName: "", state: "", district: "", recentCropCode: "", lastHarvestOn: "" });
   const [plot, setPlot] = useState({ name: "", area: "", areaUnit: "acre", irrigation: "rainfed", mechanization: "manual" });
@@ -120,7 +114,6 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
   const [harvestRecord, setHarvestRecord] = useState({ yieldAmount: "", yieldUnit: "quintal", occurredOn: today(), detail: "" });
   const [ledger, setLedger] = useState({ kind: "expense", category: "seed", amount: "", occurredOn: today(), note: "" });
 
-  const verified = demo || Boolean(user && !user.isAnonymous);
   const activeCycle = state.cycles.find((item) => item.id === activeCycleId) ?? state.cycles[0];
   const activeLedger = state.ledger.filter((entry) => entry.cycleId === activeCycle?.id);
   const totals = summarizeLedger(activeLedger);
@@ -159,18 +152,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
   }
 
   useEffect(() => {
-    if (demo) {
-      void refresh().catch((error) => onError(error.message));
-      return () => resetPhoneVerifier();
-    }
-    void currentUser()
-      .then((value) => {
-        setUser(value);
-        if (!value.isAnonymous) return refresh();
-        setLoaded(true);
-      })
-      .catch((error) => onError(error.message));
-    return () => resetPhoneVerifier();
+    void refresh().catch((error) => onError(error.message));
   }, []);
 
   async function commit(next: Phase2State) {
@@ -187,26 +169,6 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
     } finally {
       setBusy(false);
     }
-  }
-
-  function submitPhone(event: FormEvent) {
-    event.preventDefault();
-    void action(async () => {
-      if (!recaptcha.current) throw new Error(t.error);
-      setConfirmation(await beginPhoneAuth(phone, recaptcha.current, phoneIntent));
-    });
-  }
-
-  function confirmPhone(event: FormEvent) {
-    event.preventDefault();
-    void action(async () => {
-      if (!confirmation) throw new Error(t.error);
-      const result = await confirmation.confirm(code);
-      await result.user.getIdToken(true);
-      resetPhoneVerifier();
-      setUser(result.user);
-      await refresh();
-    });
   }
 
   function saveProfile(event: FormEvent) {
@@ -405,24 +367,6 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
 
   if (!loaded) return <section className="records-page section"><p>{t.loadingRecords}</p></section>;
 
-  if (!verified) return (
-    <section className="records-page section">
-      <div className="records-heading"><div><p className="eyebrow">{t.testIdentity}</p><h1>{t.verifyPhone}</h1><p>{t.testIdentityCopy}</p></div><ShieldCheck size={42} /></div>
-      {!confirmation ? (
-        <form className="record-form compact" onSubmit={submitPhone}>
-          <label>{t.phoneNumber}<input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" required /></label>
-          <button className="primary" disabled={busy}>{t.sendCode}</button>
-        </form>
-      ) : (
-        <form className="record-form compact" onSubmit={confirmPhone}>
-          <label>{t.verificationCode}<input value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" pattern="[0-9]{6}" required /></label>
-          <button className="primary" disabled={busy}>{t.confirmCode}</button>
-        </form>
-      )}
-      <div ref={recaptcha} />
-    </section>
-  );
-
   if (!state.profile) return (
     <section className="records-page section">
       <div className="records-heading"><div><p className="eyebrow">{t.records}</p><h1>{t.profileTitle}</h1><p>{t.profileCopy}</p></div><ShieldCheck size={42} /></div>
@@ -430,8 +374,7 @@ export function FarmRecords({ copy: t, locale, phoneIntent = "link", onError }: 
       {recordNotice && <p className="record-notice deletion-success" role="status">{recordNotice}</p>}
       <form className="record-form" onSubmit={saveProfile}>
         <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
-        <label>{t.state}<input value={profile.state} onChange={(event) => setProfile({ ...profile, state: event.target.value })} required /></label>
-        <label>{t.district}<input value={profile.district} onChange={(event) => setProfile({ ...profile, district: event.target.value })} required /></label>
+        <LocationFields copy={t} state={profile.state} district={profile.district} onChange={(location) => setProfile({ ...profile, ...location })} />
         <label>{t.recentCrop}<select value={profile.recentCropCode} onChange={(event) => setProfile({ ...profile, recentCropCode: event.target.value })}><option value="">{t.notProvided}</option>{priorityCrops.map(([cropCode]) => <option key={cropCode} value={cropCode}>{t[cropKey[cropCode]]}</option>)}</select></label>
         <label>{t.lastHarvestDate}<input type="date" max={today()} value={profile.lastHarvestOn} onChange={(event) => setProfile({ ...profile, lastHarvestOn: event.target.value })} /></label>
         <button className="primary" disabled={busy}>{t.saveProfile}</button>

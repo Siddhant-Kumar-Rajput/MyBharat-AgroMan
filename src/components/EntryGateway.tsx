@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import type { Copy } from "../lib/i18n";
+import { languages } from "../../shared/domain";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -14,9 +15,12 @@ type Props = {
   onGoogle: () => Promise<void>;
   onError: (message: string) => void;
   onDismissError: () => void;
+  locale: string;
+  onLocaleChange: (locale: string) => void;
+  onStory: () => void;
 };
 
-export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDismissError }: Props) {
+export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDismissError, locale, onLocaleChange, onStory }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"guest" | "google" | "">("");
 
@@ -75,7 +79,10 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
     <div className="entry" ref={root}>
       <nav className="entry-nav" aria-label={t.navigation}>
         <div className="entry-brand"><img src="/mark.svg" alt="" /><span>MyBharat AgroMan</span></div>
-        <button className="entry-nav-action" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={16} /></button>
+        <div className="entry-nav-tools">
+          <label className="entry-language"><Globe2 size={16} /><span className="visually-hidden">{t.language}</span><select value={locale} onChange={(event) => onLocaleChange(event.target.value)}>{languages.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
+          <button className="entry-nav-action" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={16} /></button>
+        </div>
       </nav>
       {error && <div className="entry-error" role="alert"><span>{error}</span><button onClick={onDismissError}>{t.dismiss}</button></div>}
 
@@ -89,6 +96,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
               <button className="entry-primary" disabled={Boolean(busy)} onClick={() => void run("guest", onGuest)}>{t.continueGuest}<ArrowUpRight size={18} /></button>
               <button className="entry-secondary google-entry" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}><span className="google-mark">G</span>{t.googleAccess}</button>
             </div>
+            <button className="entry-story-link" type="button" onClick={onStory}>{t.openStory}<ArrowUpRight size={16} /><small>{t.openStoryCopy}</small></button>
             <p className="entry-consent"><ShieldCheck size={15} />{t.entryConsent}</p>
           </div>
           <div className="entry-hero-visual">

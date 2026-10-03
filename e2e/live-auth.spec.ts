@@ -4,7 +4,7 @@ const livePhone = process.env.AGROMAN_LIVE_TEST_PHONE;
 const liveCode = process.env.AGROMAN_LIVE_TEST_CODE;
 
 async function removeLiveRecord(page: Page) {
-  const records = page.getByRole("button", { name: "Farm records", exact: true });
+  const records = page.getByRole("button", { name: "My Farm Diary", exact: true });
   if (await records.isVisible().catch(() => false)) await records.click();
   const remove = page.getByRole("button", { name: "Delete my farm record" });
   const emptyProfile = page.getByRole("heading", { name: "Create your farmer profile" });
@@ -23,6 +23,7 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
   // The test-mode frontend disables app verification only for this localhost
   // route. Firebase still validates the fictional phone/code and issues a real
   // project token, which the live Worker verifies before loading records.
+  await page.addInitScript(() => localStorage.setItem("agroman-language-chosen", "yes"));
   await page.goto("http://127.0.0.1:5173/?live-auth-test=1");
   await page.getByRole("button", { name: "Farmer login / sign up", exact: true }).first().click();
   await page.getByRole("button", { name: /Continue with phone/ }).click();
@@ -41,15 +42,15 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
   await page.getByRole("button", { name: "Community watch", exact: true }).click();
   await expect(page.getByRole("img", { name: "Geographic district view for Ludhiana" })).toBeVisible();
   await expect(page.locator("path.district-boundary")).toBeVisible();
-  await page.getByRole("button", { name: "Farm records", exact: true }).click();
+  await page.getByRole("button", { name: "My Farm Diary", exact: true }).click();
   await expect(page.getByRole("button", { name: "Return to entry and switch account" })).toHaveText("Verified farmer");
   await removeLiveRecord(page);
   await expect(page.getByRole("heading", { name: "Create your farmer profile" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save profile" })).toBeEnabled({ timeout: 20000 });
   try {
     await page.getByLabel("Farmer name (optional)").fill("Automated verification");
-    await page.getByLabel("State").fill("Odisha");
-    await page.getByLabel("District").fill("Cuttack");
+    await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
+    await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Kataka");
     await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
     await page.getByLabel("Most recent harvest date (optional)").fill("2026-05-20");
     const profileResponse = page.waitForResponse(
@@ -79,7 +80,7 @@ test("live fictional farmer records persist and reviewer access is denied", asyn
     await expect(page.getByText(/Recorded yield: 10 Quintal/)).toBeVisible({ timeout: 20000 });
 
     await page.reload();
-    await page.getByRole("button", { name: "Farm records", exact: true }).click();
+    await page.getByRole("button", { name: "My Farm Diary", exact: true }).click();
     await expect(page.getByText("Automated verification")).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole("button", { name: /Verification plot/ })).toBeVisible();
     await expect(page.getByText("Active crop cycle: Rice")).toBeVisible();

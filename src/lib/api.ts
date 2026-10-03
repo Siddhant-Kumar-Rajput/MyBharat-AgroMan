@@ -3,15 +3,11 @@ import {
   getAuth,
   GoogleAuthProvider,
   linkWithPopup,
-  linkWithPhoneNumber,
   onAuthStateChanged,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
   signInWithPopup,
   signInAnonymously,
   signOut,
   type Auth,
-  type ConfirmationResult,
   type User,
 } from "firebase/auth";
 import {
@@ -53,8 +49,6 @@ let credentials:
 let appCheck: AppCheck | undefined;
 let firebaseApp: FirebaseApp | undefined;
 let firebaseAuth: Auth | undefined;
-let phoneVerifier: RecaptchaVerifier | undefined;
-let phoneVerifierContainer: HTMLElement | undefined;
 function firebase() {
   if (!firebaseApp) {
     firebaseApp =
@@ -86,32 +80,6 @@ export function observeUser(callback: (user: User | null) => void) {
   return onAuthStateChanged(firebase().auth, callback);
 }
 
-export function resetPhoneVerifier() {
-  phoneVerifier?.clear();
-  phoneVerifier = undefined;
-  phoneVerifierContainer?.replaceChildren();
-  phoneVerifierContainer = undefined;
-}
-
-export async function beginPhoneAuth(
-  phoneNumber: string,
-  container: HTMLElement,
-  intent: "link" | "signin" = "link",
-): Promise<ConfirmationResult> {
-  const { auth } = firebase();
-  if (phoneVerifierContainer !== container) resetPhoneVerifier();
-  phoneVerifier ??= new RecaptchaVerifier(auth, container, { size: "invisible" });
-  phoneVerifierContainer = container;
-  try {
-    if (intent === "signin")
-      return await signInWithPhoneNumber(auth, phoneNumber, phoneVerifier);
-    return await linkWithPhoneNumber(await currentUser(), phoneNumber, phoneVerifier);
-  } catch (error) {
-    resetPhoneVerifier();
-    throw error;
-  }
-}
-
 export async function beginGoogleAuth(intent: "link" | "signin" = "signin") {
   const { auth } = firebase();
   await auth.authStateReady();
@@ -125,7 +93,6 @@ export async function beginGoogleAuth(intent: "link" | "signin" = "signin") {
 
 export async function signOutUser() {
   credentials = undefined;
-  resetPhoneVerifier();
   await signOut(firebase().auth);
 }
 async function headers() {

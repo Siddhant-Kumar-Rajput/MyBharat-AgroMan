@@ -3,8 +3,9 @@ import { ArrowUpRight, Camera, CheckCircle2, History, Leaf, MapPin, MessageCircl
 import type { User } from "firebase/auth";
 import { PHASE2_CONSENT_VERSION, type Phase2State, type ProfileInput } from "../../shared/domain";
 import type { Copy } from "../lib/i18n";
-import { demo } from "../lib/api";
+import { demo, request } from "../lib/api";
 import { loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
+import { LocationFields } from "./LocationFields";
 
 type DashboardPage = "advisor" | "records" | "community";
 type Props = {
@@ -26,6 +27,10 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError }: 
   const [saved, setSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState({ displayName: "", state: "", district: "" });
+  const [phoneStatus, setPhoneStatus] = useState<{ configured: boolean; verified: boolean; last4: string | null }>({ configured: false, verified: false, last4: null });
+  const [phone, setPhone] = useState("+91");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +48,13 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError }: 
       })
       .catch((error) => onError(error instanceof Error ? error.message : t.error));
     return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (demo || !user || user.isAnonymous) return;
+    request<{ configured: boolean; verified: boolean; last4: string | null }>("phone/status")
+      .then(setPhoneStatus)
+      .catch(() => setPhoneStatus({ configured: false, verified: false, last4: null }));
   }, [user?.uid]);
 
   function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -83,6 +95,33 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError }: 
       }
       setEditing(false);
       setSaved(true);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : t.error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendOtp() {
+    setBusy(true);
+    try {
+      await request("phone/send", { phone });
+      setOtpSent(true);
+      setSaved(false);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : t.error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyOtp() {
+    setBusy(true);
+    try {
+      const result = await request<{ verified: boolean; last4: string; verifiedAt: number }>("phone/check", { phone, code: otp });
+      setPhoneStatus({ configured: true, verified: result.verified, last4: result.last4 });
+      setOtp("");
+      setOtpSent(false);
     } catch (error) {
       onError(error instanceof Error ? error.message : t.error);
     } finally {
@@ -131,8 +170,19 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError }: 
           <div className="card-label"><CheckCircle2 size={15} />{t.accountStatus}</div>
           <h2>{t.googleSignedIn}</h2>
           <p>{t.googleRecordAccess}</p>
-          <div className={user?.phoneNumber ? "account-pill linked" : "account-pill"}><Phone size={14} />{user?.phoneNumber || t.phoneOptional}</div>
-          <small>{t.phoneOptionalCopy}</small>
+          <div className={phoneStatus.verified ? "account-pill linked" : "account-pill"}><Phone size={14} />{phoneStatus.verified ? t.phoneVerifiedEnding.replace("{last4}", phoneStatus.last4 || "") : t.phoneOptional}</div>
+          <small>{phoneStatus.verified ? t.phonePrivacy : t.phoneOptionalCopy}</small>
+          {!phoneStatus.verified && phoneStatus.configured && (
+            <div className="phone-verification">
+              <strong>{t.phoneVerifyAction}</strong>
+              <p>{t.phoneVerifyWhy}</p>
+              <label>{t.phoneEnter}<input inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\s/g, ""))} /></label>
+              {otpSent && <><p className="phone-sent" role="status">{t.phoneCodeSent}</p><label>{t.phoneOtp}<input inputMode="numeric" autoComplete="one-time-code" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 10))} /></label></>}
+              <button type="button" disabled={busy || (otpSent ? otp.length < 4 : !/^\+91[6-9]\d{9}$/.test(phone))} onClick={() => void (otpSent ? verifyOtp() : sendOtp())}>{otpSent ? t.phoneConfirmOtp : t.phoneSendOtp}</button>
+              <small>{t.phonePrivacy}</small>
+            </div>
+          )}
+          {!phoneStatus.verified && !phoneStatus.configured && <p className="phone-unavailable">{t.phoneVerifyUnavailable}</p>}
         </article>
 
         {editing && (
@@ -140,8 +190,7 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError }: 
             <div><p className="card-label">{t.profileDetails}</p><h2>{state.profile ? t.updateProfile : t.completeProfile}</h2><p>{t.profileDashboardCopy}</p></div>
             <form onSubmit={saveProfile}>
               <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
-              <label>{t.state}<input required value={profile.state} onChange={(event) => setProfile({ ...profile, state: event.target.value })} /></label>
-              <label>{t.district}<input required value={profile.district} onChange={(event) => setProfile({ ...profile, district: event.target.value })} /></label>
+              <LocationFields copy={t} state={profile.state} district={profile.district} onChange={(location) => setProfile({ ...profile, ...location })} />
               <button className="primary" disabled={busy}>{busy ? t.working : t.saveProfile}</button>
             </form>
           </article>

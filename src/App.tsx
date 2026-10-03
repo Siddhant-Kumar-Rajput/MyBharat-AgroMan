@@ -63,6 +63,8 @@ import { FarmRecords } from "./components/FarmRecords";
 import { ExpertReview } from "./components/ExpertReview";
 import { EntryGateway } from "./components/EntryGateway";
 import { FarmerDashboard } from "./components/FarmerDashboard";
+import { LanguageGate } from "./components/LanguageGate";
+import { StoryMode } from "./components/StoryMode";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert";
 type EntryMode = "visitor" | "guest" | "farmer";
@@ -76,7 +78,6 @@ export default function App() {
     const stored = sessionStorage.getItem("agroman-entry-mode");
     return stored === "guest" || stored === "farmer" ? stored : "visitor";
   });
-  const [phoneIntent, setPhoneIntent] = useState<"link" | "signin">("link");
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [districtId, setDistrictId] = useState(() => {
     const stored = localStorage.getItem("agroman-district");
@@ -88,6 +89,8 @@ export default function App() {
   });
   const [copy, setCopy] = useState<Copy>(english);
   const [languageBusy, setLanguageBusy] = useState(false);
+  const [languageChosen, setLanguageChosen] = useState(() => localStorage.getItem("agroman-language-chosen") === "yes");
+  const [storyMode, setStoryMode] = useState(false);
   const [error, setError] = useState("");
   const [region, setRegion] = useState<Context>();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -206,7 +209,7 @@ export default function App() {
       ? "rtl"
       : "ltr";
     setCopy(english);
-    if (locale !== "en" && !demo && entryMode !== "visitor") {
+    if (locale !== "en" && !demo) {
       setLanguageBusy(true);
       request<Copy>("translate/ui", { locale })
         .then((value) => {
@@ -300,7 +303,6 @@ export default function App() {
   );
   function go(next: Page) {
     if (busy) return;
-    if (next === "records" && entryMode === "guest") setPhoneIntent("link");
     setPage(next);
     setMenu(false);
     setError("");
@@ -318,7 +320,6 @@ export default function App() {
       setAuthUser(user);
     }
     sessionStorage.setItem("agroman-entry-mode", "farmer");
-    setPhoneIntent("link");
     setEntryMode("farmer");
     setPage("home");
   }
@@ -593,6 +594,21 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   }
+  if (storyMode) return <StoryMode copy={copy} onExit={() => { setStoryMode(false); window.scrollTo(0, 0); }} />;
+  if (entryMode === "visitor" && !languageChosen)
+    return (
+      <LanguageGate
+        copy={copy}
+        locale={locale}
+        busy={languageBusy}
+        onChoose={setLocale}
+        onContinue={() => {
+          localStorage.setItem("agroman-language-chosen", "yes");
+          setLanguageChosen(true);
+          window.scrollTo(0, 0);
+        }}
+      />
+    );
   if (entryMode === "visitor")
     return (
       <EntryGateway
@@ -602,6 +618,9 @@ export default function App() {
         onGoogle={enterWithGoogle}
         onError={setError}
         onDismissError={() => setError("")}
+        locale={locale}
+        onLocaleChange={setLocale}
+        onStory={() => { setStoryMode(true); window.scrollTo(0, 0); }}
       />
     );
   const identityLabel = authUser?.phoneNumber
@@ -1131,7 +1150,7 @@ export default function App() {
             </div>
           </section>
         ) : page === "records" ? (
-          <FarmRecords copy={copy} locale={locale} phoneIntent={phoneIntent} onError={setError} />
+          <FarmRecords copy={copy} locale={locale} onError={setError} />
         ) : page === "expert" ? (
           <ExpertReview copy={copy} onError={setError} />
         ) : (

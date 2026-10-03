@@ -38,6 +38,9 @@ interface Env {
   DAILY_REQUEST_LIMIT: string;
   SUBJECT_ID_KEY?: string;
   REVIEWER_UID_HASHES?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_VERIFY_SERVICE_SID?: string;
 }
 
 class ApiError extends Error {
@@ -210,6 +213,27 @@ async function subjectId(env: Env, uid: string) {
   if (!env.SUBJECT_ID_KEY)
     throw new ApiError(503, "Phase 2 identity storage is not configured.");
   return hmac(uid, env.SUBJECT_ID_KEY);
+}
+
+function phoneVerificationConfigured(env: Env) {
+  return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID);
+}
+
+async function twilioVerify(env: Env, endpoint: "Verifications" | "VerificationCheck", values: Record<string, string>) {
+  if (!phoneVerificationConfigured(env))
+    throw new ApiError(503, "Mobile verification is not configured yet.");
+  const url = `https://verify.twilio.com/v2/Services/${encodeURIComponent(env.TWILIO_VERIFY_SERVICE_SID!)}/${endpoint}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(values),
+  });
+  const result = await response.json() as { status?: string; message?: string };
+  if (!response.ok) throw new ApiError(response.status === 429 ? 429 : 502, result.message || "The OTP provider could not complete this request.");
+  return result;
 }
 
 async function authenticate(request: Request, env: Env) {
@@ -559,6 +583,12 @@ async function route(request: Request, env: Env) {
   const uid = auth.uid;
   await rateLimit(env, uid, "all", 300);
 
+  if (request.method === "GET" && path === "capabilities")
+    return json(request, env, {
+      phoneVerification: phoneVerificationConfigured(env),
+      phoneVerificationProvider: phoneVerificationConfigured(env) ? "Twilio Verify" : null,
+    });
+
   if (request.method === "GET" && path === "helplines") {
     const state = (url.searchParams.get("state") || "").trim().toLowerCase();
     return json(request, env, {
@@ -589,10 +619,50 @@ async function route(request: Request, env: Env) {
     });
   }
 
-  const persistentPhase2Path = /^(profile|records|plots|cycles|events|ledger|exports|cases|expert)(\/|$)/.test(path);
+  const persistentPhase2Path = /^(profile|records|plots|cycles|events|ledger|exports|cases|expert|phone)(\/|$)/.test(path);
   if (persistentPhase2Path && auth.provider === "anonymous")
     throw new ApiError(403, "Sign in with Google to use persistent farm records.");
   const subject = persistentPhase2Path ? await subjectId(env, uid) : "";
+
+  if (path === "phone/status" && request.method === "GET") {
+    const row = await env.DB.prepare(
+      "SELECT phone_last4, verified_at FROM phone_verifications WHERE subject_id = ?",
+    ).bind(subject).first<{ phone_last4: string; verified_at: number }>();
+    return json(request, env, {
+      configured: phoneVerificationConfigured(env),
+      verified: Boolean(row),
+      last4: row?.phone_last4 || null,
+      verifiedAt: row?.verified_at || null,
+    });
+  }
+
+  if (path === "phone/send" && request.method === "POST") {
+    const input = z.object({ phone: z.string().regex(/^\+91[6-9]\d{9}$/) }).parse(await body(request));
+    await rateLimit(env, uid, "phone-send", 5);
+    await twilioVerify(env, "Verifications", { To: input.phone, Channel: "sms" });
+    return json(request, env, { sent: true });
+  }
+
+  if (path === "phone/check" && request.method === "POST") {
+    const input = z.object({
+      phone: z.string().regex(/^\+91[6-9]\d{9}$/),
+      code: z.string().regex(/^\d{4,10}$/),
+    }).parse(await body(request));
+    await rateLimit(env, uid, "phone-check", 10);
+    const result = await twilioVerify(env, "VerificationCheck", { To: input.phone, Code: input.code });
+    if (result.status !== "approved") throw new ApiError(400, "The verification code is invalid or expired.");
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO phone_verifications (subject_id, phone_hash, phone_last4, verified_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(subject_id) DO UPDATE SET
+         phone_hash = excluded.phone_hash,
+         phone_last4 = excluded.phone_last4,
+         verified_at = excluded.verified_at,
+         updated_at = excluded.updated_at`,
+    ).bind(subject, await hmac(input.phone, env.SUBJECT_ID_KEY!), input.phone.slice(-4), now, now).run();
+    return json(request, env, { verified: true, last4: input.phone.slice(-4), verifiedAt: now });
+  }
 
   if (path === "profile" && request.method === "GET") {
     const row = await env.DB.prepare(
@@ -665,6 +735,7 @@ async function route(request: Request, env: Env) {
       env.DB.prepare("DELETE FROM farm_plots WHERE subject_id = ?").bind(subject),
       env.DB.prepare("DELETE FROM record_exports WHERE subject_id = ?").bind(subject),
       env.DB.prepare("DELETE FROM in_app_alerts WHERE subject_id = ?").bind(subject),
+      env.DB.prepare("DELETE FROM phone_verifications WHERE subject_id = ?").bind(subject),
       env.DB.prepare("DELETE FROM farmer_profiles WHERE subject_id = ?").bind(subject),
     ]);
     return json(request, env, { ok: true });
