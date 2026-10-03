@@ -544,15 +544,25 @@ async function translateUi(env: Env, locale: string) {
     .first<{ copy_json: string }>();
   if (cached) return JSON.parse(cached.copy_json) as typeof english;
   const values = Object.values(english);
-  const raw = (await env.AI.run("@cf/ai4bharat/indictrans2-en-indic-1B", {
-    text: values,
-    target_language: target,
-  })) as unknown as { translations?: Array<string | { translation?: string }> };
-  const translated = raw.translations?.map((item) =>
-    typeof item === "string" ? item : item.translation || "",
-  );
+  const chunks: string[][] = [];
+  for (let index = 0; index < values.length; index += 48)
+    chunks.push(values.slice(index, index + 48));
+  const translated: string[] = [];
+  // Bound model concurrency so a first-time language load does not overload the
+  // inference service. D1 serves every subsequent request from the cache.
+  for (let index = 0; index < chunks.length; index += 3) {
+    const results = await Promise.all(
+      chunks.slice(index, index + 3).map(async (texts) => {
+        const result = await env.AI.run(
+          "@cf/ai4bharat/indictrans2-en-indic-1B",
+          { text: texts, target_language: target },
+        );
+        return result.translations;
+      }),
+    );
+    translated.push(...results.flat());
+  }
   if (
-    !translated ||
     translated.length !== values.length ||
     translated.some((v) => !v)
   )
