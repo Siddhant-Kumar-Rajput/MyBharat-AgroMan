@@ -10,9 +10,25 @@ async function enterAsGuest(page: Page) {
 }
 
 async function openNavigationItem(page: Page, name: string) {
-  const item = page.getByRole("button", { name, exact: true });
-  if (!(await item.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
-  await item.click();
+  const matching = page.getByRole("button", { name, exact: true });
+  let visibleIndex = -1;
+  for (let index = 0; index < await matching.count(); index += 1) {
+    if (await matching.nth(index).isVisible()) {
+      visibleIndex = index;
+      break;
+    }
+  }
+  if (visibleIndex < 0) {
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+    for (let index = 0; index < await matching.count(); index += 1) {
+      if (await matching.nth(index).isVisible()) {
+        visibleIndex = index;
+        break;
+      }
+    }
+  }
+  expect(visibleIndex, `A visible navigation button named ${name}`).toBeGreaterThanOrEqual(0);
+  await matching.nth(visibleIndex).click();
 }
 
 test("landing separates limited guest access from Google farmer sign-in", async ({ page }) => {
@@ -38,6 +54,23 @@ test("browser back returns to the previous in-app page and information routes lo
   await expect(page.getByRole("heading", { name: "Privacy policy" })).toBeVisible();
 });
 
+test("mobile-safe landing and farmer story keep copy separated inside the shared shell", async ({ page }) => {
+  await page.goto("/");
+  const story = page.getByRole("button", { name: /View the farmer story/ });
+  const consent = page.getByText(/Guest access stays anonymous/);
+  const storyBox = await story.boundingBox();
+  const consentBox = await consent.boundingBox();
+  expect(storyBox).not.toBeNull();
+  expect(consentBox).not.toBeNull();
+  expect(storyBox!.y + storyBox!.height).toBeLessThanOrEqual(consentBox!.y);
+  const languageOptions = await page.getByLabel("Language").first().locator("option").evaluateAll((options) => options.slice(0, 2).map((option) => option.getAttribute("value")));
+  expect(languageOptions).toEqual(["en", "hi"]);
+  await story.click();
+  await expect(page.getByRole("button", { name: "Go to home or overview" })).toBeVisible();
+  await expect(page.getByLabel("Diary fields filled during the demonstration")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("farmer dashboard manages profile preview and signs out cleanly", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
@@ -59,6 +92,7 @@ test("farmer dashboard manages profile preview and signs out cleanly", async ({ 
   await expect(page.getByAltText("Farmer profile preview")).toBeVisible();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Profile saved.");
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Understand every season/ })).toBeVisible();
 });
@@ -186,6 +220,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.goto("/");
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: /Namaste/ })).toBeVisible();
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await openNavigationItem(page, "My Farm Diary");
   await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
@@ -229,7 +264,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: /^Records/ }).click();
   await expect(page.getByText("155333 · Odisha")).toBeVisible();
 
-  await page.getByRole("button", { name: "Expert review" }).click();
+  await openNavigationItem(page, "Expert review");
   await expect(page.getByText("AI-assisted pre-review")).toBeVisible();
   await expect(page.getByText("Priority review")).toBeVisible();
   await page.getByLabel("Reviewer remedy summary").fill("Review the affected plants and continue field monitoring.");
@@ -238,9 +273,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByLabel("Authoritative source URL").fill("https://icar.gov.in/");
   await page.getByRole("button", { name: "Approve sourced guidance" }).click();
   await expect(page.getByText("No cases are waiting for review.")).toBeVisible();
-  const farmRecordsNav = page.getByRole("button", { name: "My Farm Diary", exact: true });
-  if (!(await farmRecordsNav.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
-  await farmRecordsNav.click();
+  await openNavigationItem(page, "My Farm Diary");
   await page.getByRole("button", { name: /^Records/ }).click();
 
   const download = page.waitForEvent("download");

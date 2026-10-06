@@ -10,18 +10,15 @@ import {
   ImagePlus,
   X,
   Volume2,
-  Globe,
   ChevronDown,
   ShieldCheck,
   Radio,
   Download,
-  Menu,
   Check,
   Loader2,
   Square,
   MessageCircle,
   LocateFixed,
-  ExternalLink,
 } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -40,6 +37,8 @@ import {
   type Report,
   type Thread,
   type FarmLocation,
+  type FarmerProfile,
+  type WeatherSummary,
   locationDistrictId,
 } from "../shared/domain";
 import {
@@ -68,6 +67,7 @@ import { FarmerDashboard } from "./components/FarmerDashboard";
 import { LanguageGate } from "./components/LanguageGate";
 import { StoryMode } from "./components/StoryMode";
 import { InfoPage, type InfoPageKind } from "./components/InfoPage";
+import { SiteFooter, SiteHeader } from "./components/SiteChrome";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
 type EntryMode = "visitor" | "guest" | "farmer";
@@ -112,13 +112,13 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [consent, setConsent] = useState<Message>();
-  const [menu, setMenu] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [boundary, setBoundary] = useState<DistrictGeometry>();
   const [showExamples, setShowExamples] = useState(false);
   const [activeLocation, setActiveLocation] = useState<FarmLocation>();
+  const [approximateCenter, setApproximateCenter] = useState<{ lat: number; lon: number }>();
   const [liveClusters, setLiveClusters] = useState<
     ReturnType<typeof clusterReports>
   >([]);
@@ -148,6 +148,30 @@ export default function App() {
     if (demo) return;
     return observeUser(setAuthUser);
   }, []);
+  useEffect(() => {
+    if (entryMode !== "farmer" || !authUser || authUser.isAnonymous) return;
+    let cancelled = false;
+    request<{ profile: FarmerProfile | null }>("profile")
+      .then(({ profile }) => {
+        if (cancelled || !profile) return;
+        setActiveLocation(profile);
+        setDistrictId(locationDistrictId(profile));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [entryMode, authUser?.uid]);
+  useEffect(() => {
+    if (!activeLocation || knownDistrict || demo) {
+      setApproximateCenter(undefined);
+      return;
+    }
+    let cancelled = false;
+    const query = new URLSearchParams({ state: activeLocation.state, district: activeLocation.district, locality: activeLocation.locality || "" });
+    request<WeatherSummary>(`weather?${query}`)
+      .then((weather) => { if (!cancelled) setApproximateCenter({ lat: weather.latitude, lon: weather.longitude }); })
+      .catch(() => { if (!cancelled) setApproximateCenter(undefined); });
+    return () => { cancelled = true; };
+  }, [activeLocation?.state, activeLocation?.district, activeLocation?.locality, knownDistrict?.id]);
   useEffect(() => {
     const onPopState = () => {
       const next = pageFromPath();
@@ -232,17 +256,30 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
+    const localCopyKey = `agroman-ui-copy-v2-${locale}`;
     localStorage.setItem("agroman-locale", locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
       ? "rtl"
       : "ltr";
-    setCopy(english);
+    let cachedCopy: Copy | undefined;
+    if (locale !== "en") {
+      try {
+        const cached = localStorage.getItem(localCopyKey);
+        if (cached) cachedCopy = JSON.parse(cached) as Copy;
+      } catch {
+        localStorage.removeItem(localCopyKey);
+      }
+    }
+    setCopy(cachedCopy ?? english);
     if (locale !== "en" && !demo) {
-      setLanguageBusy(true);
+      setLanguageBusy(!cachedCopy);
       request<Copy>("translate/ui", { locale })
         .then((value) => {
-          if (!cancelled) setCopy(value);
+          if (!cancelled) {
+            setCopy(value);
+            localStorage.setItem(localCopyKey, JSON.stringify(value));
+          }
         })
         .catch((e) => {
           if (!cancelled) setError(e.message);
@@ -336,7 +373,6 @@ export default function App() {
     const route = pageRoutes[next];
     if (window.location.pathname !== route)
       window.history[replace ? "replaceState" : "pushState"]({ page: next }, "", route);
-    setMenu(false);
     setError("");
     window.scrollTo(0, 0);
   }
@@ -627,9 +663,16 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   }
-  if (storyMode) return <StoryMode copy={copy} onExit={() => { setStoryMode(false); window.history.back(); window.scrollTo(0, 0); }} />;
+  const homeAction = () => {
+    if (entryMode === "visitor") {
+      setPage("home");
+      window.history.pushState({}, "", "/");
+      window.scrollTo(0, 0);
+    } else go("home");
+  };
+  if (storyMode) return <StoryMode copy={copy} locale={locale} onLocaleChange={setLocale} onExit={() => { setStoryMode(false); window.history.back(); window.scrollTo(0, 0); }} />;
   const infoPages: InfoPageKind[] = ["terms", "privacyPolicy", "dataConsent", "features", "aboutProject", "aboutCreator"];
-  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} kind={page as InfoPageKind} onBack={() => window.history.back()} />;
+  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} locale={locale} onLocaleChange={setLocale} kind={page as InfoPageKind} onBack={() => window.history.back()} onHome={homeAction} />;
   if (entryMode === "visitor" && !languageChosen)
     return (
       <LanguageGate
@@ -658,11 +701,6 @@ export default function App() {
         onStory={() => { window.history.pushState({ story: true }, "", "/story"); setStoryMode(true); window.scrollTo(0, 0); }}
       />
     );
-  const identityLabel = authUser?.phoneNumber
-    ? t("verifiedFarmer")
-    : authUser?.providerData.some((provider) => provider.providerId === "google.com")
-      ? t("googleLinked")
-      : t("guestSession");
   const locationSelector = activeLocation && !knownDistrict ? (
     <div className="location-select location-current"><MapPin size={17} /><span>{districtLabel}</span></div>
   ) : (
@@ -689,68 +727,29 @@ export default function App() {
       <ChevronDown size={14} />
     </div>
   );
+  const mapDistrict = knownDistrict ?? (activeLocation && approximateCenter ? {
+    id: districtId,
+    name: activeLocation.district,
+    state: activeLocation.state,
+    lat: approximateCenter.lat,
+    lon: approximateCenter.lon,
+  } : undefined);
   return (
     <div ref={root} className="app">
       <a href="#content" className="skip">
         {t("skip")}
       </a>
-      <header className="nav">
-        <button
-          className="brand"
-          onClick={() => go("home")}
-          aria-label="AgroMan home"
-        >
-          <img src="/mark.svg" alt="" />
-          <span>
-            agroman<span className="brand-dot">.</span>
-          </span>
-        </button>
-        <nav
-          className={menu ? "nav-links open" : "nav-links"}
-          aria-label={t("navigation")}
-        >
-          {((entryMode === "guest" ? ["advisor", "community"] : ["home", "advisor", "records", "community"]) as Page[]).map((item) => (
-            <button
-              key={item}
-              className={page === item ? "selected" : ""}
-              onClick={() => go(item)}
-            >
-              {t(item as keyof Copy)}
-            </button>
-          ))}
-        </nav>
-        <div className="nav-tools">
-          <label className="language">
-            <Globe size={16} />
-            <select
-              aria-label={t("language")}
-              value={locale}
-              onChange={(e) => setLocale(e.target.value)}
-            >
-              {languages.map(([code, name]) => (
-                <option value={code} key={code}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="mobile-menu icon-button"
-            aria-label={t("menu")}
-            onClick={() => setMenu(!menu)}
-          >
-            <Menu />
-          </button>
-          <button className="identity-switch" onClick={leaveExperience} aria-label={t("switchAccount")}>
-            <ShieldCheck size={15} />
-            {entryMode === "farmer" ? t("signOut") : t("exitGuest")}
-          </button>
-          <button className="nav-cta" onClick={() => go("advisor")}>
-            {t("openAdvisor")}
-            <ArrowUpRight size={16} />
-          </button>
-        </div>
-      </header>
+      <SiteHeader
+        copy={copy}
+        locale={locale}
+        onLocaleChange={setLocale}
+        onHome={() => go("home")}
+        items={((entryMode === "guest" ? ["advisor", "community"] : ["home", "advisor", "records", "community"]) as Page[]).map((item) => ({ label: t(item as keyof Copy), active: page === item, onClick: () => go(item) }))}
+        menuActions={[
+          ...(entryMode === "farmer" ? [{ label: t("expert"), onClick: () => go("expert") }] : []),
+          { label: entryMode === "farmer" ? t("signOut") : t("exitGuest"), onClick: leaveExperience },
+        ]}
+      />
       <div className="mode-strip">
         <span className="status-dot" />
         {demo ? t("demo") : t("live")}
@@ -1245,12 +1244,12 @@ export default function App() {
               </div>
             )}
             <div className="watch-grid">
-              {knownDistrict ? <DistrictMap
-                district={district}
-                geometry={boundary}
+              {mapDistrict ? <DistrictMap
+                district={mapDistrict}
+                geometry={knownDistrict ? boundary : undefined}
                 clusters={watchClusters}
-                caption={t("mapCaption")}
-                ariaLabel={`${t("mapLabel")} ${district.name}`}
+                caption={knownDistrict ? t("mapCaption") : t("approximateMapCaption")}
+                ariaLabel={`${t("mapLabel")} ${mapDistrict.name}`}
               /> : <div className="community-empty-map"><MapPin size={36} /><h2>{districtLabel}</h2><p>{t("noBoundary")}</p></div>}
               <div className="incident-list">
                 {!watchClusters.length ? (
@@ -1283,29 +1282,7 @@ export default function App() {
           </section>
         )}
       </main>
-      <footer>
-        <button className="brand" onClick={() => go("home")}>
-          <img src="/mark.svg" alt="" />
-          <span>agroman.</span>
-        </button>
-        <p>{t("footer")}</p>
-        <a
-          href="https://github.com/Siddhant-Kumar-Rajput/MyBharat-AgroMan"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub <ExternalLink size={13} />
-        </a>
-        {entryMode === "farmer" && <button className="footer-link" onClick={() => go("expert")}>{t("expert")}</button>}
-        <nav className="footer-pages" aria-label={t("informationPages")}>
-          <button onClick={() => go("terms")}>{t("termsTitle")}</button>
-          <button onClick={() => go("privacyPolicy")}>{t("privacyTitle")}</button>
-          <button onClick={() => go("dataConsent")}>{t("dataTitle")}</button>
-          <button onClick={() => go("features")}>{t("featuresTitle")}</button>
-          <button onClick={() => go("aboutProject")}>{t("aboutProjectTitle")}</button>
-          <button onClick={() => go("aboutCreator")}>{t("aboutCreatorTitle")}</button>
-        </nav>
-      </footer>
+      <SiteFooter copy={copy} />
       {consent && (
         <div
           className="modal-backdrop"

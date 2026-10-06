@@ -4,7 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import type { Copy } from "../lib/i18n";
-import { languages } from "../../shared/domain";
+import { SiteFooter, SiteHeader } from "./SiteChrome";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -77,20 +77,14 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
 
   return (
     <div className="entry" ref={root}>
-      <nav className="entry-nav" aria-label={t.navigation}>
-        <div className="entry-brand"><img src="/mark.svg" alt="" /><span>MyBharat AgroMan</span></div>
-        <div className="entry-nav-tools">
-          <label className="entry-language"><Globe2 size={16} /><span className="visually-hidden">{t.language}</span><select value={locale} onChange={(event) => onLocaleChange(event.target.value)}>{languages.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
-          <button className="entry-nav-action" disabled={Boolean(busy)} onClick={() => void run("google", onGoogle)}>{t.googleAccess}<ArrowUpRight size={16} /></button>
-        </div>
-      </nav>
+      <SiteHeader copy={t} locale={locale} onLocaleChange={onLocaleChange} onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} primaryAction={{ label: t.googleAccess, onClick: () => void run("google", onGoogle) }} menuActions={[{ label: t.continueGuest, onClick: () => void run("guest", onGuest) }]} />
       {error && <div className="entry-error" role="alert"><span>{error}</span><button onClick={onDismissError}>{t.dismiss}</button></div>}
 
       <main className="entry-main">
         <section className="entry-hero">
           <div className="entry-hero-copy">
             <p className="entry-kicker"><Sprout size={15} />{t.entryBrandLine}</p>
-            <h1>{t.entryHeadlineA}<span className="entry-inline-image" aria-hidden="true" />{t.entryHeadlineB}</h1>
+            <h1>{t.entryHeadlineA}<br /><span>{t.entryHeadlineB}</span></h1>
             <p className="entry-lead">{t.entryCopy}</p>
             <div className="entry-actions">
               <button className="entry-primary" disabled={Boolean(busy)} onClick={() => void run("guest", onGuest)}>{t.continueGuest}<ArrowUpRight size={18} /></button>
@@ -131,7 +125,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
         </section>
       </main>
 
-      <footer className="entry-footer"><span>MyBharat AgroMan</span><p>{t.footer}</p><nav aria-label={t.informationPages}><a href="/terms">{t.termsTitle}</a><a href="/privacy">{t.privacyTitle}</a><a href="/data-and-consent">{t.dataTitle}</a><a href="/features">{t.featuresTitle}</a><a href="/about">{t.aboutProjectTitle}</a><a href="/creator">{t.aboutCreatorTitle}</a></nav><span>{t.entryFooter}</span></footer>
+      <SiteFooter copy={t} />
 
     </div>
   );

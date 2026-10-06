@@ -3,10 +3,11 @@ import { useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import type { Copy } from "../lib/i18n";
+import { SiteFooter, SiteHeader } from "./SiteChrome";
 
-type Props = { copy: Copy; onExit: () => void };
+type Props = { copy: Copy; locale: string; onLocaleChange: (locale: string) => void; onExit: () => void };
 
-export function StoryMode({ copy: t, onExit }: Props) {
+export function StoryMode({ copy: t, locale, onLocaleChange, onExit }: Props) {
   const root = useRef<HTMLElement>(null);
   const [chapter, setChapter] = useState(0);
   const chapters = [
@@ -28,7 +29,8 @@ export function StoryMode({ copy: t, onExit }: Props) {
 
   return (
     <main className="story-mode" ref={root}>
-      <header className="story-nav"><button type="button" onClick={onExit}><ArrowLeft size={17} />{t.backToIntro}</button><span>{t.syntheticStoryBadge}</span></header>
+      <SiteHeader copy={t} locale={locale} onLocaleChange={onLocaleChange} onHome={onExit} menuActions={[{ label: t.backToIntro, onClick: onExit }]} />
+      <div className="story-context"><span>{t.syntheticStoryBadge}</span></div>
       <section className="story-shell interactive-story">
         <aside className="story-intro">
           <p className="eyebrow">{t.storyMode}</p><h1>{t.storyFarmerName}</h1><p>{t.storyFarmerProfile}</p>
@@ -43,6 +45,7 @@ export function StoryMode({ copy: t, onExit }: Props) {
           <small className="story-disclosure">{t.syntheticCase}</small>
         </article>
       </section>
+      <SiteFooter copy={t} />
     </main>
   );
 }

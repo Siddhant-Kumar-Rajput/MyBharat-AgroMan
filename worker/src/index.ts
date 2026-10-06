@@ -549,7 +549,7 @@ async function translateUi(env: Env, locale: string) {
   const target = translationLocales[locale];
   if (!target)
     throw new ApiError(422, "Translation is unavailable for this language.");
-  const version = (await sha256(JSON.stringify(english))).slice(0, 12);
+  const version = (await sha256(`placeholder-safe-v2:${JSON.stringify(english)}`)).slice(0, 12);
   const cacheKey = `${version}_${locale}`;
   const cached = await env.DB.prepare(
     "SELECT copy_json FROM translations WHERE cache_key = ?",
@@ -582,7 +582,18 @@ async function translateUi(env: Env, locale: string) {
   )
     throw new ApiError(502, "Translation was incomplete.");
   const copy = Object.fromEntries(
-    Object.keys(english).map((key, index) => [key, translated[index]]),
+    Object.keys(english).map((key, index) => {
+      const source = Object.values(english)[index];
+      const placeholders = source.match(/\{[a-zA-Z0-9_]+\}/g) || [];
+      let value = translated[index];
+      const translatedPlaceholders = value.match(/\{[^}]+\}/g) || [];
+      placeholders.forEach((placeholder, placeholderIndex) => {
+        const translatedPlaceholder = translatedPlaceholders[placeholderIndex];
+        if (translatedPlaceholder) value = value.replace(translatedPlaceholder, placeholder);
+        else value = `${value} ${placeholder}`;
+      });
+      return [key, value];
+    }),
   ) as typeof english;
   await env.DB.prepare(
     "INSERT OR REPLACE INTO translations (cache_key, copy_json, created_at) VALUES (?, ?, ?)",

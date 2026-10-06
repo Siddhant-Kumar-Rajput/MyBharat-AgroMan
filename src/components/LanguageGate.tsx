@@ -1,6 +1,7 @@
 import { ArrowRight, Languages } from "lucide-react";
 import { languages } from "../../shared/domain";
 import type { Copy } from "../lib/i18n";
+import { SiteFooter, SiteHeader } from "./SiteChrome";
 
 type Props = {
   copy: Copy;
@@ -13,8 +14,8 @@ type Props = {
 export function LanguageGate({ copy: t, locale, busy, onChoose, onContinue }: Props) {
   return (
     <main className="language-gate">
+      <SiteHeader copy={t} locale={locale} onLocaleChange={onChoose} onHome={() => undefined} />
       <section className="language-gate-card" aria-labelledby="language-gate-title">
-        <div className="language-gate-brand"><img src="/mark.svg" alt="" /><span>MyBharat AgroMan</span></div>
         <div className="language-gate-heading">
           <span className="language-gate-icon"><Languages /></span>
           <p>{t.languageGateEyebrow}</p>
@@ -34,6 +35,7 @@ export function LanguageGate({ copy: t, locale, busy, onChoose, onContinue }: Pr
         </button>
         <p className="language-voice-note">{t.voiceLanguageNote}</p>
       </section>
+      <SiteFooter copy={t} />
     </main>
   );
 }
