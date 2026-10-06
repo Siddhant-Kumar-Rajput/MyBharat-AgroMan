@@ -26,6 +26,18 @@ test("landing separates limited guest access from Google farmer sign-in", async 
   await expect(page.getByRole("button", { name: "Overview", exact: true })).toHaveCount(0);
 });
 
+test("browser back returns to the previous in-app page and information routes load directly", async ({ page }) => {
+  await enterAsGuest(page);
+  await expect(page).toHaveURL(/\/advisor$/);
+  await openNavigationItem(page, "Community watch");
+  await expect(page).toHaveURL(/\/community$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/advisor$/);
+  await expect(page.getByRole("heading", { name: "Let’s talk about your land." })).toBeVisible();
+  await page.goto("/privacy");
+  await expect(page.getByRole("heading", { name: "Privacy policy" })).toBeVisible();
+});
+
 test("farmer dashboard manages profile preview and signs out cleanly", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
@@ -193,6 +205,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Save activity" }).click();
   await expect(page.getByText("First irrigation")).toBeVisible();
 
+  await page.getByRole("button", { name: /Inputs or harvest/ }).click();
   await page.getByLabel("Farmer-entered product or material name").fill("Recorded compost");
   await page.getByLabel("Recorded quantity").fill("25");
   await page.getByLabel("Farmer-entered purpose").fill("Soil preparation record");
@@ -204,13 +217,16 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Save harvest record" }).click();
   await expect(page.getByText(/Recorded yield: 18 Quintal/)).toBeVisible();
 
+  await page.getByRole("button", { name: /^Money/ }).click();
   await page.getByLabel("Amount in rupees").fill("1250.50");
   await page.getByRole("button", { name: "Save entry" }).click();
   await expect(page.getByText("₹1,250.5")).toBeVisible();
 
+  await page.getByRole("button", { name: /^Crop health/ }).click();
   await page.getByRole("button", { name: "Create labelled example case" }).click();
   await expect(page.getByText("Model score, not diagnostic certainty or probability of a cure.").first()).toBeVisible();
   await expect(page.getByText(/AGM-DEMO-/)).toBeVisible();
+  await page.getByRole("button", { name: /^Records/ }).click();
   await expect(page.getByText("155333 · Odisha")).toBeVisible();
 
   await page.getByRole("button", { name: "Expert review" }).click();
@@ -225,6 +241,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   const farmRecordsNav = page.getByRole("button", { name: "My Farm Diary", exact: true });
   if (!(await farmRecordsNav.isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
   await farmRecordsNav.click();
+  await page.getByRole("button", { name: /^Records/ }).click();
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download JSON" }).click();

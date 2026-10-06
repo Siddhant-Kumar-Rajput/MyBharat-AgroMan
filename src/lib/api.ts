@@ -169,14 +169,20 @@ export async function advise(input: AdviceRequest): Promise<Answer> {
         ],
       },
     };
-  const d = districts.find((d) => d.id === input.districtId)!;
+  const d = districts.find((d) => d.id === input.districtId);
+  const selectedName = d?.name || (() => {
+    const parts = input.districtId.split(":");
+    try { return parts.length >= 3 ? decodeURIComponent(parts[2]) : "your selected district"; }
+    catch { return "your selected district"; }
+  })();
   return {
-    text: `Demonstration response for ${d.name}\n\nBefore choosing your next crop, tell me your land size, previous crop, harvest date and whether irrigation is available. These details help establish a realistic planting window.\n\nThe live advisory will combine your answers with dated regional soil and weather observations. Regional estimates do not replace a soil test.\n\nWhat did you grow most recently?`,
+    text: `Demonstration response for ${selectedName}\n\nBefore choosing your next crop, tell me your land size, previous crop, harvest date and whether irrigation is available. These details help establish a realistic planting window.\n\nThe live advisory will combine your answers with dated regional soil and weather observations. Regional estimates do not replace a soil test.\n\nWhat did you grow most recently?`,
     diagnosis: null,
   };
 }
 export function demoReports(districtId: string): Report[] {
-  const d = districts.find((d) => d.id === districtId)!;
+  const d = districts.find((d) => d.id === districtId);
+  if (!d) return [];
   return [0, 1, 2, 3].map((i) => ({
     id: `seed-${districtId}-${i}`,
     installation: `synthetic-${i}`,

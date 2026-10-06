@@ -131,7 +131,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
         </section>
       </main>
 
-      <footer className="entry-footer"><span>MyBharat AgroMan</span><p>{t.footer}</p><span>{t.entryFooter}</span></footer>
+      <footer className="entry-footer"><span>MyBharat AgroMan</span><p>{t.footer}</p><nav aria-label={t.informationPages}><a href="/terms">{t.termsTitle}</a><a href="/privacy">{t.privacyTitle}</a><a href="/data-and-consent">{t.dataTitle}</a><a href="/features">{t.featuresTitle}</a><a href="/about">{t.aboutProjectTitle}</a><a href="/creator">{t.aboutCreatorTitle}</a></nav><span>{t.entryFooter}</span></footer>
 
     </div>
   );

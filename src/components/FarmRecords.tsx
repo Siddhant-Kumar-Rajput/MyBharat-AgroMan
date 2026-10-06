@@ -105,8 +105,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
   const [busy, setBusy] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [recordNotice, setRecordNotice] = useState("");
+  const [section, setSection] = useState<"setup" | "activity" | "inputs" | "money" | "health" | "export">("setup");
   const [activeCycleId, setActiveCycleId] = useState("");
-  const [profile, setProfile] = useState({ displayName: "", state: "", district: "", recentCropCode: "", lastHarvestOn: "" });
+  const [profile, setProfile] = useState({ displayName: "", state: "", district: "", locality: "", pincode: "", recentCropCode: "", lastHarvestOn: "" });
   const [plot, setPlot] = useState({ name: "", area: "", areaUnit: "acre", irrigation: "rainfed", mechanization: "manual" });
   const [cycle, setCycle] = useState<{ plotId: string; cropCode: CropCycleInput["cropCode"]; variety: string; startedOn: string; expectedHarvestOn: string }>({ plotId: "", cropCode: "RICE", variety: "", startedOn: today(), expectedHarvestOn: "" });
   const [activity, setActivity] = useState({ title: "", detail: "", occurredOn: today() });
@@ -144,6 +145,8 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       displayName: value.profile?.displayName ?? "",
       state: value.profile?.state ?? "",
       district: value.profile?.district ?? "",
+      locality: value.profile?.locality ?? "",
+      pincode: value.profile?.pincode ?? "",
       recentCropCode: value.profile?.recentCropCode ?? "",
       lastHarvestOn: value.profile?.lastHarvestOn ?? "",
     });
@@ -179,6 +182,8 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
         locale,
         state: profile.state,
         district: profile.district,
+        locality: profile.locality,
+        pincode: profile.pincode,
         recentCropCode: profile.recentCropCode as ProfileInput["recentCropCode"],
         lastHarvestOn: profile.lastHarvestOn,
         consentVersion: PHASE2_CONSENT_VERSION,
@@ -198,7 +203,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       if (demo) await persistDemoPhase2(emptyState);
       else await deletePhase2Record();
       setState(emptyState);
-      setProfile({ displayName: "", state: "", district: "", recentCropCode: "", lastHarvestOn: "" });
+      setProfile({ displayName: "", state: "", district: "", locality: "", pincode: "", recentCropCode: "", lastHarvestOn: "" });
       setActiveCycleId("");
       setDeleteArmed(false);
       setRecordNotice(t.recordDeleted);
@@ -244,6 +249,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
         await refresh();
         setActiveCycleId(result.id);
       }
+      setSection("activity");
     });
   }
 
@@ -374,7 +380,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       {recordNotice && <p className="record-notice deletion-success" role="status">{recordNotice}</p>}
       <form className="record-form" onSubmit={saveProfile}>
         <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
-        <LocationFields copy={t} state={profile.state} district={profile.district} onChange={(location) => setProfile({ ...profile, ...location })} />
+        <LocationFields copy={t} state={profile.state} district={profile.district} locality={profile.locality} pincode={profile.pincode} onChange={(location) => setProfile({ ...profile, ...location })} />
         <label>{t.recentCrop}<select value={profile.recentCropCode} onChange={(event) => setProfile({ ...profile, recentCropCode: event.target.value })}><option value="">{t.notProvided}</option>{priorityCrops.map(([cropCode]) => <option key={cropCode} value={cropCode}>{t[cropKey[cropCode]]}</option>)}</select></label>
         <label>{t.lastHarvestDate}<input type="date" max={today()} value={profile.lastHarvestOn} onChange={(event) => setProfile({ ...profile, lastHarvestOn: event.target.value })} /></label>
         <button className="primary" disabled={busy}>{t.saveProfile}</button>
@@ -390,7 +396,17 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       </div>
       {demo && <div className="demo-banner"><ShieldCheck size={17} />{t.syntheticCase}</div>}
 
+      <nav className="diary-actions" aria-label={t.diaryChooseAction}>
+        <button className={section === "setup" ? "active" : ""} onClick={() => setSection("setup")}><MapPin /><span><strong>{t.diarySetup}</strong><small>{t.diarySetupCopy}</small></span></button>
+        <button className={section === "activity" ? "active" : ""} onClick={() => setSection("activity")}><BookOpen /><span><strong>{t.diaryActivity}</strong><small>{t.diaryActivityCopy}</small></span></button>
+        <button className={section === "inputs" ? "active" : ""} onClick={() => setSection("inputs")}><PackageOpen /><span><strong>{t.diaryInputs}</strong><small>{t.diaryInputsCopy}</small></span></button>
+        <button className={section === "money" ? "active" : ""} onClick={() => setSection("money")}><BadgeIndianRupee /><span><strong>{t.diaryMoney}</strong><small>{t.diaryMoneyCopy}</small></span></button>
+        <button className={section === "health" ? "active" : ""} onClick={() => setSection("health")}><ShieldCheck /><span><strong>{t.diaryHealth}</strong><small>{t.diaryHealthCopy}</small></span></button>
+        <button className={section === "export" ? "active" : ""} onClick={() => setSection("export")}><FileText /><span><strong>{t.diaryExport}</strong><small>{t.diaryExportCopy}</small></span></button>
+      </nav>
+
       <div className="records-grid">
+        {section === "setup" && <>
         <article className="record-panel plots-panel">
           <div className="panel-title"><MapPin /><div><h2>{t.addPlot}</h2><p>{t.phase2Privacy}</p></div></div>
           <form className="record-form" onSubmit={addPlot}>
@@ -416,7 +432,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
           </form>
           <div className="cycle-tabs">{state.cycles.map((item) => <button className={activeCycle?.id === item.id ? "selected" : ""} key={item.id} onClick={() => setActiveCycleId(item.id)}>{t[cropKey[item.cropCode]]}<small>{item.startedOn}</small></button>)}</div>
         </article>
+        </>}
 
+        {section === "activity" &&
         <article className="record-panel activity-panel">
           <div className="panel-title"><BookOpen /><div><h2>{t.addEvent}</h2><p>{activeCycle ? `${t.activeCycle}: ${t[cropKey[activeCycle.cropCode]]}` : t.noCycles}</p></div></div>
           <form className="record-form compact" onSubmit={addActivity}>
@@ -426,8 +444,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
             <button className="secondary" disabled={busy || !activeCycle}>{t.saveActivity}</button>
           </form>
           <div className="timeline">{state.events.filter((item) => item.cycleId === activeCycle?.id).map((item) => <div key={item.id}><span /><div><strong>{item.title}</strong><small>{item.occurredOn} · {t.selfReported}</small>{item.type === "input" && item.amount !== undefined && item.unit && <p>{t.recordedQuantity}: {item.amount} {t[unitKey[item.unit]]} · {item.purpose}</p>}{item.type === "harvest" && item.yieldAmount !== undefined && item.yieldUnit && <p>{t.recordedYield}: {item.yieldAmount} {t[unitKey[item.yieldUnit]]}</p>}{item.detail && <p>{item.detail}</p>}</div></div>)}</div>
-        </article>
+        </article>}
 
+        {section === "money" &&
         <article className="record-panel finance-panel">
           <div className="panel-title"><BadgeIndianRupee /><div><h2>{t.addLedger}</h2><p>{t.selfReported}</p></div></div>
           <div className="finance-summary"><div><small>{t.totalExpenses}</small><strong>₹{(totals.expensesPaise / 100).toLocaleString("en-IN")}</strong></div><div><small>{t.totalRevenue}</small><strong>₹{(totals.revenuePaise / 100).toLocaleString("en-IN")}</strong></div><div><small>{t.estimatedMargin}</small><strong>₹{(totals.marginPaise / 100).toLocaleString("en-IN")}</strong></div></div>
@@ -438,8 +457,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
             <label>{t.eventDate}<input type="date" value={ledger.occurredOn} onChange={(event) => setLedger({ ...ledger, occurredOn: event.target.value })} required /></label>
             <button className="secondary" disabled={busy || !activeCycle}>{t.saveEntry}</button>
           </form>
-        </article>
+        </article>}
 
+        {section === "inputs" &&
         <article className="record-panel structured-panel">
           <div className="panel-title"><PackageOpen /><div><h2>{t.structuredRecords}</h2><p>{t.structuredRecordsCopy}</p></div></div>
           <div className="structured-records">
@@ -463,8 +483,12 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
               <button className="secondary" disabled={busy || !activeCycle}>{t.saveHarvest}</button>
             </form>
           </div>
-        </article>
+          <div className="timeline structured-history">
+            {state.events.filter((item) => item.cycleId === activeCycle?.id && (item.type === "input" || item.type === "harvest")).map((item) => <div key={item.id}><span /><div><strong>{item.type === "input" ? item.productName : t.harvestRecorded}</strong><small>{item.occurredOn} · {t.selfReported}</small>{item.type === "input" && item.amount !== undefined && item.unit && <p>{t.recordedQuantity}: {item.amount} {t[unitKey[item.unit]]} · {item.purpose}</p>}{item.type === "harvest" && item.yieldAmount !== undefined && item.yieldUnit && <p>{t.recordedYield}: {item.yieldAmount} {t[unitKey[item.yieldUnit]]}</p>}</div></div>)}
+          </div>
+        </article>}
 
+        {section === "health" &&
         <article className="record-panel case-panel">
           <div className="panel-title"><ShieldCheck /><div><h2>{t.healthCase}</h2><p>{t.confidenceExplanation}</p></div></div>
           {!activeCase ? <button className="secondary" disabled={!activeCycle} onClick={createExampleCase}>{t.createExampleCase}</button> : <>
@@ -472,8 +496,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
             <div className="matches"><h3>{t.similarCases}</h3>{matches.map((match) => <div key={match.caseId}><CheckCircle2 size={16} /><span><strong>{match.reference}</strong><small>{match.score}% · {match.reasons.map((reason) => reasonKey[reason] ? t[reasonKey[reason]] : reason).join(", ")}</small></span></div>)}</div>
             <div className="outcome-actions"><button className="text-button" onClick={() => recordOutcome(3, "improved")}>{t.outcome3}: {t.improved}</button><button className="text-button" onClick={() => recordOutcome(7, "resolved")}>{t.outcome7}: {t.resolved}</button></div>
           </>}
-        </article>
+        </article>}
 
+        {section === "export" &&
         <article className="record-panel export-panel">
           <div className="panel-title"><FileText /><div><h2>{t.exportRecord}</h2><p>{t.exportNotice}</p></div></div>
           <div className="export-actions"><button className="secondary" onClick={exportJson}><Download size={16} />{t.exportJson}</button><button className="secondary" onClick={exportCsv}><Download size={16} />{t.exportCsv}</button><button className="secondary" onClick={() => window.print()}><Printer size={16} />{t.printPdf}</button></div>
@@ -493,7 +518,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
             )}
             {recordNotice && <p className="record-notice" role="status">{recordNotice}</p>}
           </div>
-        </article>
+        </article>}
       </div>
     </section>
   );

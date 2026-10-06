@@ -39,6 +39,8 @@ import {
   type Message,
   type Report,
   type Thread,
+  type FarmLocation,
+  locationDistrictId,
 } from "../shared/domain";
 import {
   advise,
@@ -65,15 +67,24 @@ import { EntryGateway } from "./components/EntryGateway";
 import { FarmerDashboard } from "./components/FarmerDashboard";
 import { LanguageGate } from "./components/LanguageGate";
 import { StoryMode } from "./components/StoryMode";
+import { InfoPage, type InfoPageKind } from "./components/InfoPage";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
-type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert";
+type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
 type EntryMode = "visitor" | "guest" | "farmer";
+const pageRoutes: Record<Page, string> = {
+  home: "/dashboard", advisor: "/advisor", records: "/diary", community: "/community",
+  authority: "/community/authority", expert: "/expert-review", terms: "/terms",
+  privacyPolicy: "/privacy", dataConsent: "/data-and-consent", features: "/features",
+  aboutProject: "/about", aboutCreator: "/creator",
+};
+function pageFromPath(): Page | undefined {
+  const path = window.location.pathname.replace(/\/$/, "") || "/";
+  return (Object.entries(pageRoutes).find(([, route]) => route === path)?.[0] as Page | undefined);
+}
 const photo =
   "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=2000&q=85";
 export default function App() {
-  const [page, setPage] = useState<Page>(() =>
-    sessionStorage.getItem("agroman-entry-mode") === "guest" ? "advisor" : "home",
-  );
+  const [page, setPage] = useState<Page>(() => pageFromPath() ?? (sessionStorage.getItem("agroman-entry-mode") === "guest" ? "advisor" : "home"));
   const [entryMode, setEntryMode] = useState<EntryMode>(() => {
     const stored = sessionStorage.getItem("agroman-entry-mode");
     return stored === "guest" || stored === "farmer" ? stored : "visitor";
@@ -107,6 +118,7 @@ export default function App() {
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [boundary, setBoundary] = useState<DistrictGeometry>();
   const [showExamples, setShowExamples] = useState(false);
+  const [activeLocation, setActiveLocation] = useState<FarmLocation>();
   const [liveClusters, setLiveClusters] = useState<
     ReturnType<typeof clusterReports>
   >([]);
@@ -120,7 +132,11 @@ export default function App() {
   const voiceQuestion = useRef(false);
   const modalRef = useRef<HTMLElement>(null);
   const t = (key: keyof Copy) => copy[key];
-  const district = districts.find((d) => d.id === districtId) ?? districts[0];
+  const knownDistrict = districts.find((d) => d.id === districtId);
+  const district = knownDistrict ?? districts[0];
+  const districtLabel = activeLocation
+    ? [activeLocation.locality, activeLocation.district, activeLocation.state].filter(Boolean).join(", ")
+    : `${district.name}, ${district.state}`;
   const current = threads.find((thread) => thread.id === active);
   const clusters = demo ? clusterReports(reports) : liveClusters;
   const watchClusters = showExamples
@@ -132,6 +148,19 @@ export default function App() {
     if (demo) return;
     return observeUser(setAuthUser);
   }, []);
+  useEffect(() => {
+    const onPopState = () => {
+      const next = pageFromPath();
+      if (next) setPage(next);
+      else if (window.location.pathname === "/") {
+        setStoryMode(false);
+        if (entryMode !== "visitor") setPage(entryMode === "guest" ? "advisor" : "home");
+      }
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [entryMode]);
   useEffect(() => {
     readThreads()
       .then((list) => {
@@ -301,9 +330,12 @@ export default function App() {
     },
     { scope: root, dependencies: [page, entryMode], revertOnUpdate: true },
   );
-  function go(next: Page) {
+  function go(next: Page, replace = false) {
     if (busy) return;
     setPage(next);
+    const route = pageRoutes[next];
+    if (window.location.pathname !== route)
+      window.history[replace ? "replaceState" : "pushState"]({ page: next }, "", route);
     setMenu(false);
     setError("");
     window.scrollTo(0, 0);
@@ -312,7 +344,7 @@ export default function App() {
     if (!demo) await currentUser();
     sessionStorage.setItem("agroman-entry-mode", "guest");
     setEntryMode("guest");
-    setPage("advisor");
+    go("advisor");
   }
   async function enterWithGoogle() {
     if (!demo) {
@@ -321,13 +353,14 @@ export default function App() {
     }
     sessionStorage.setItem("agroman-entry-mode", "farmer");
     setEntryMode("farmer");
-    setPage("home");
+    go("home");
   }
   function leaveExperience() {
     sessionStorage.removeItem("agroman-entry-mode");
     setAuthUser(null);
     setEntryMode("visitor");
     setPage("home");
+    window.history.pushState({}, "", "/");
     setError("");
     window.scrollTo(0, 0);
     if (!demo)
@@ -594,7 +627,9 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   }
-  if (storyMode) return <StoryMode copy={copy} onExit={() => { setStoryMode(false); window.scrollTo(0, 0); }} />;
+  if (storyMode) return <StoryMode copy={copy} onExit={() => { setStoryMode(false); window.history.back(); window.scrollTo(0, 0); }} />;
+  const infoPages: InfoPageKind[] = ["terms", "privacyPolicy", "dataConsent", "features", "aboutProject", "aboutCreator"];
+  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} kind={page as InfoPageKind} onBack={() => window.history.back()} />;
   if (entryMode === "visitor" && !languageChosen)
     return (
       <LanguageGate
@@ -620,7 +655,7 @@ export default function App() {
         onDismissError={() => setError("")}
         locale={locale}
         onLocaleChange={setLocale}
-        onStory={() => { setStoryMode(true); window.scrollTo(0, 0); }}
+        onStory={() => { window.history.pushState({ story: true }, "", "/story"); setStoryMode(true); window.scrollTo(0, 0); }}
       />
     );
   const identityLabel = authUser?.phoneNumber
@@ -628,7 +663,9 @@ export default function App() {
     : authUser?.providerData.some((provider) => provider.providerId === "google.com")
       ? t("googleLinked")
       : t("guestSession");
-  const locationSelector = (
+  const locationSelector = activeLocation && !knownDistrict ? (
+    <div className="location-select location-current"><MapPin size={17} /><span>{districtLabel}</span></div>
+  ) : (
     <div className="location-select">
       <MapPin size={17} />
       <select
@@ -678,7 +715,7 @@ export default function App() {
               className={page === item ? "selected" : ""}
               onClick={() => go(item)}
             >
-              {t(item)}
+              {t(item as keyof Copy)}
             </button>
           ))}
         </nav>
@@ -743,7 +780,7 @@ export default function App() {
       <main id="content">
         {page === "home" ? (
           entryMode === "farmer" ? (
-            <FarmerDashboard copy={copy} locale={locale} user={authUser} onNavigate={go} onError={setError} />
+            <FarmerDashboard copy={copy} locale={locale} user={authUser} onNavigate={go} onError={setError} onLocationChange={(location) => { setActiveLocation(location); changeDistrict(locationDistrictId(location)); }} />
           ) : <>
             <section className="hero">
               <div className="hero-content">
@@ -1208,13 +1245,13 @@ export default function App() {
               </div>
             )}
             <div className="watch-grid">
-              <DistrictMap
+              {knownDistrict ? <DistrictMap
                 district={district}
                 geometry={boundary}
                 clusters={watchClusters}
                 caption={t("mapCaption")}
                 ariaLabel={`${t("mapLabel")} ${district.name}`}
-              />
+              /> : <div className="community-empty-map"><MapPin size={36} /><h2>{districtLabel}</h2><p>{t("noBoundary")}</p></div>}
               <div className="incident-list">
                 {!watchClusters.length ? (
                   <p>{t("noReports")}</p>
@@ -1260,7 +1297,14 @@ export default function App() {
           GitHub <ExternalLink size={13} />
         </a>
         {entryMode === "farmer" && <button className="footer-link" onClick={() => go("expert")}>{t("expert")}</button>}
-        <span>PHASE 2 / 2026</span>
+        <nav className="footer-pages" aria-label={t("informationPages")}>
+          <button onClick={() => go("terms")}>{t("termsTitle")}</button>
+          <button onClick={() => go("privacyPolicy")}>{t("privacyTitle")}</button>
+          <button onClick={() => go("dataConsent")}>{t("dataTitle")}</button>
+          <button onClick={() => go("features")}>{t("featuresTitle")}</button>
+          <button onClick={() => go("aboutProject")}>{t("aboutProjectTitle")}</button>
+          <button onClick={() => go("aboutCreator")}>{t("aboutCreatorTitle")}</button>
+        </nav>
       </footer>
       {consent && (
         <div

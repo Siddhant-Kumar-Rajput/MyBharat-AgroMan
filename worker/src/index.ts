@@ -65,7 +65,15 @@ const localeSchema = z
   .refine((value) => languages.some(([code]) => code === value));
 const districtSchema = z
   .string()
-  .refine((value) => districts.some((district) => district.id === value));
+  .trim()
+  .min(3)
+  .max(220);
+const pincodeSchema = z.string().regex(/^\d{6}$/);
+const approximateLocationSchema = z.object({
+  state: z.string().trim().min(2).max(100),
+  district: z.string().trim().min(2).max(120),
+  locality: z.string().trim().max(160).optional().default(""),
+});
 
 type IndicTranslationLocale =
   | "asm_Beng"
@@ -324,10 +332,16 @@ async function getContext(env: Env, districtId: string): Promise<Context> {
       summary: string;
     }>();
   if (!row)
-    throw new ApiError(
-      404,
-      "No verified regional data is available for this district yet.",
-    );
+    return {
+      districtId,
+      soilPh: null,
+      rainfallMm: null,
+      moisture: null,
+      observedAt: new Date().toISOString(),
+      source: "No verified district dataset connected",
+      summary: "Verified regional context is not available for this location yet. Advice must not infer field measurements from the selected district.",
+      mode: "live",
+    };
   return {
     districtId: row.district_id,
     soilPh: row.soil_ph,
@@ -629,6 +643,149 @@ async function route(request: Request, env: Env) {
     });
   }
 
+  if (request.method === "GET" && path === "locations/pincode") {
+    const pincode = pincodeSchema.parse(url.searchParams.get("pincode"));
+    await rateLimit(env, uid, "pincode", 60);
+    const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new ApiError(502, "PIN lookup is temporarily unavailable.");
+    const payload = await response.json() as Array<{
+      Status?: string;
+      Message?: string;
+      PostOffice?: Array<{
+        Name?: string;
+        Block?: string;
+        District?: string;
+        State?: string;
+        Pincode?: string;
+      }> | null;
+    }>;
+    const locations = (payload[0]?.PostOffice ?? [])
+      .map((office) => ({
+        locality: (office.Name || office.Block || "").trim(),
+        district: (office.District || "").trim(),
+        state: (office.State || "").trim(),
+        pincode: office.Pincode || pincode,
+      }))
+      .filter((location) => location.locality && location.district && location.state)
+      .filter((location, index, values) =>
+        values.findIndex((candidate) =>
+          candidate.locality === location.locality &&
+          candidate.district === location.district &&
+          candidate.state === location.state
+        ) === index,
+      );
+    if (!locations.length) throw new ApiError(404, "No place was found for this PIN code.");
+    return json(request, env, {
+      locations,
+      source: "Postal PIN Code API",
+      sourceUrl: "https://api.postalpincode.in/",
+      disclosure: "Only the six-digit PIN code was sent to the lookup provider.",
+    });
+  }
+
+  if (request.method === "GET" && path === "weather") {
+    const location = approximateLocationSchema.parse({
+      state: url.searchParams.get("state"),
+      district: url.searchParams.get("district"),
+      locality: url.searchParams.get("locality") || "",
+    });
+    await rateLimit(env, uid, "weather", 80);
+    const place = [location.locality || location.district, location.state]
+      .filter(Boolean)
+      .join(", ");
+    const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    geocodeUrl.searchParams.set("name", place);
+    geocodeUrl.searchParams.set("count", "1");
+    geocodeUrl.searchParams.set("countryCode", "IN");
+    geocodeUrl.searchParams.set("language", "en");
+    const geocodeResponse = await fetch(geocodeUrl, { headers: { Accept: "application/json" } });
+    if (!geocodeResponse.ok) throw new ApiError(502, "Weather location lookup is temporarily unavailable.");
+    const geocode = await geocodeResponse.json() as {
+      results?: Array<{ name: string; latitude: number; longitude: number; admin1?: string; admin2?: string }>;
+    };
+    const match = geocode.results?.[0];
+    if (!match) throw new ApiError(404, "Weather is not available for this selected location yet.");
+    const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
+    forecastUrl.searchParams.set("latitude", String(match.latitude));
+    forecastUrl.searchParams.set("longitude", String(match.longitude));
+    forecastUrl.searchParams.set("current", "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m");
+    forecastUrl.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max");
+    forecastUrl.searchParams.set("forecast_days", "5");
+    forecastUrl.searchParams.set("timezone", "Asia/Kolkata");
+    const forecastResponse = await fetch(forecastUrl, { headers: { Accept: "application/json" } });
+    if (!forecastResponse.ok) throw new ApiError(502, "Weather forecast is temporarily unavailable.");
+    const forecast = await forecastResponse.json() as {
+      current?: Record<string, number | string>;
+      daily?: Record<string, Array<number | string | null>>;
+    };
+    const current = forecast.current || {};
+    const daily = forecast.daily || {};
+    const dates = (daily.time || []) as string[];
+    return json(request, env, {
+      location: [match.name, match.admin2, match.admin1].filter(Boolean).join(", "),
+      latitude: Math.round(match.latitude * 100) / 100,
+      longitude: Math.round(match.longitude * 100) / 100,
+      temperatureC: typeof current.temperature_2m === "number" ? current.temperature_2m : null,
+      humidityPercent: typeof current.relative_humidity_2m === "number" ? current.relative_humidity_2m : null,
+      precipitationMm: typeof current.precipitation === "number" ? current.precipitation : null,
+      windKph: typeof current.wind_speed_10m === "number" ? current.wind_speed_10m : null,
+      weatherCode: typeof current.weather_code === "number" ? current.weather_code : null,
+      observedAt: typeof current.time === "string" ? current.time : new Date().toISOString(),
+      daily: dates.map((date, index) => ({
+        date,
+        minC: (daily.temperature_2m_min?.[index] as number | null) ?? null,
+        maxC: (daily.temperature_2m_max?.[index] as number | null) ?? null,
+        rainMm: (daily.precipitation_sum?.[index] as number | null) ?? null,
+        precipitationProbability: (daily.precipitation_probability_max?.[index] as number | null) ?? null,
+        weatherCode: (daily.weather_code?.[index] as number | null) ?? null,
+      })),
+      source: "Open-Meteo",
+      sourceUrl: "https://open-meteo.com/",
+      kind: "model_estimate",
+      disclosure: "Only the selected locality, district and state were sent for approximate weather lookup.",
+    });
+  }
+
+  if (request.method === "GET" && path === "locations/search") {
+    const location = approximateLocationSchema.extend({
+      locality: z.string().trim().min(2).max(160),
+    }).parse({
+      state: url.searchParams.get("state"),
+      district: url.searchParams.get("district"),
+      locality: url.searchParams.get("locality"),
+    });
+    await rateLimit(env, uid, "location-search", 60);
+    const lookupUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    lookupUrl.searchParams.set("name", `${location.locality}, ${location.state}`);
+    lookupUrl.searchParams.set("count", "8");
+    lookupUrl.searchParams.set("countryCode", "IN");
+    lookupUrl.searchParams.set("language", "en");
+    const response = await fetch(lookupUrl, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new ApiError(502, "Place search is temporarily unavailable.");
+    const payload = await response.json() as {
+      results?: Array<{ name: string; admin1?: string; admin2?: string; admin3?: string; admin4?: string }>;
+    };
+    const normalizedDistrict = location.district.toLowerCase();
+    const candidates = (payload.results || [])
+      .filter((item) => [item.admin2, item.admin3, item.admin4]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedDistrict) || normalizedDistrict.includes(value!.toLowerCase())))
+      .map((item) => ({
+        locality: item.name,
+        district: location.district,
+        state: location.state,
+        pincode: "",
+      }));
+    return json(request, env, {
+      locations: candidates,
+      source: "Open-Meteo geocoding (GeoNames)",
+      sourceUrl: "https://open-meteo.com/en/docs/geocoding-api",
+      disclosure: "Only the typed place, selected district and state were sent to the lookup provider.",
+    });
+  }
+
   const persistentPhase2Path = /^(profile|records|plots|cycles|events|ledger|exports|cases|expert|phone)(\/|$)/.test(path);
   if (persistentPhase2Path && auth.provider === "anonymous")
     throw new ApiError(403, "Sign in with Google to use persistent farm records.");
@@ -676,7 +833,7 @@ async function route(request: Request, env: Env) {
 
   if (path === "profile" && request.method === "GET") {
     const row = await env.DB.prepare(
-      `SELECT display_name, locale, state, district, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at
+      `SELECT display_name, locale, state, district, locality, pincode, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at
        FROM farmer_profiles WHERE subject_id = ?`,
     )
       .bind(subject)
@@ -688,6 +845,8 @@ async function route(request: Request, env: Env) {
             locale: row.locale,
             state: row.state,
             district: row.district,
+            locality: row.locality || "",
+            pincode: row.pincode || "",
             recentCropCode: row.recent_crop_code || "",
             lastHarvestOn: row.last_harvest_on || "",
             consentVersion: row.consent_version,
@@ -703,13 +862,15 @@ async function route(request: Request, env: Env) {
     const now = Date.now();
     await env.DB.prepare(
       `INSERT INTO farmer_profiles
-       (subject_id, display_name, locale, state, district, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (subject_id, display_name, locale, state, district, locality, pincode, recent_crop_code, last_harvest_on, consent_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(subject_id) DO UPDATE SET
          display_name = excluded.display_name,
          locale = excluded.locale,
          state = excluded.state,
          district = excluded.district,
+         locality = excluded.locality,
+         pincode = excluded.pincode,
          recent_crop_code = excluded.recent_crop_code,
          last_harvest_on = excluded.last_harvest_on,
          consent_version = excluded.consent_version,
@@ -721,6 +882,8 @@ async function route(request: Request, env: Env) {
         input.locale,
         input.state,
         input.district,
+        input.locality,
+        input.pincode,
         input.recentCropCode || null,
         input.lastHarvestOn || null,
         input.consentVersion,

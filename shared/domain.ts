@@ -107,7 +107,7 @@ export const positionSchema = z.object({
 export const adviceSchema = z.object({
   requestId: z.string().uuid(),
   threadId: z.string().uuid(),
-  districtId: z.string().refine((v) => districts.some((d) => d.id === v)),
+  districtId: z.string().trim().min(3).max(220),
   locale: z.string().refine((v) => languages.some((l) => l[0] === v)),
   text: z.string().min(1).max(3000),
   history: z
@@ -161,6 +161,8 @@ export const profileInputSchema = z.object({
   locale: z.string().refine((value) => languages.some(([code]) => code === value)),
   state: z.string().trim().min(2).max(100),
   district: z.string().trim().min(2).max(120),
+  locality: z.string().trim().max(160).optional().default(""),
+  pincode: z.string().regex(/^\d{6}$/).optional().or(z.literal("")).default(""),
   recentCropCode: z
     .enum(priorityCrops.map(([code]) => code) as [
       (typeof priorityCrops)[number][0],
@@ -181,6 +183,40 @@ export type FarmerProfile = ProfileInput & {
   createdAt: number;
   updatedAt: number;
 };
+
+export type FarmLocation = {
+  state: string;
+  district: string;
+  locality: string;
+  pincode: string;
+};
+
+export type WeatherSummary = {
+  location: string;
+  latitude: number;
+  longitude: number;
+  temperatureC: number | null;
+  humidityPercent: number | null;
+  precipitationMm: number | null;
+  windKph: number | null;
+  weatherCode: number | null;
+  observedAt: string;
+  daily: Array<{
+    date: string;
+    minC: number | null;
+    maxC: number | null;
+    rainMm: number | null;
+    precipitationProbability: number | null;
+    weatherCode: number | null;
+  }>;
+  source: string;
+  sourceUrl: string;
+  kind: "model_estimate";
+};
+
+export function locationDistrictId(location: Pick<FarmLocation, "state" | "district">) {
+  return `IN:${encodeURIComponent(location.state)}:${encodeURIComponent(location.district)}`;
+}
 
 export const plotInputSchema = z.object({
   name: z.string().trim().min(1).max(80),

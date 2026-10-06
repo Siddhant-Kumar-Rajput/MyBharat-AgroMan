@@ -1,0 +1,2 @@
+ALTER TABLE farmer_profiles ADD COLUMN locality TEXT NOT NULL DEFAULT '';
+ALTER TABLE farmer_profiles ADD COLUMN pincode TEXT NOT NULL DEFAULT '';
