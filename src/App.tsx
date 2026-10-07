@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -38,7 +38,6 @@ import {
   type Thread,
   type FarmLocation,
   type FarmerProfile,
-  type WeatherSummary,
   locationDistrictId,
 } from "../shared/domain";
 import {
@@ -68,6 +67,8 @@ import { LanguageGate } from "./components/LanguageGate";
 import { StoryMode } from "./components/StoryMode";
 import { InfoPage, type InfoPageKind } from "./components/InfoPage";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import type { CommunityMapPlace } from "../shared/community-map";
+const CityMap = lazy(() => import("./components/CityMap"));
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
 type EntryMode = "visitor" | "guest" | "farmer";
@@ -118,7 +119,9 @@ export default function App() {
   const [boundary, setBoundary] = useState<DistrictGeometry>();
   const [showExamples, setShowExamples] = useState(false);
   const [activeLocation, setActiveLocation] = useState<FarmLocation>();
-  const [approximateCenter, setApproximateCenter] = useState<{ lat: number; lon: number }>();
+  const [mapPlace, setMapPlace] = useState<CommunityMapPlace>();
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapRetry, setMapRetry] = useState(0);
   const [liveClusters, setLiveClusters] = useState<
     ReturnType<typeof clusterReports>
   >([]);
@@ -138,7 +141,7 @@ export default function App() {
     ? [activeLocation.locality, activeLocation.district, activeLocation.state].filter(Boolean).join(", ")
     : `${district.name}, ${district.state}`;
   const current = threads.find((thread) => thread.id === active);
-  const clusters = demo ? clusterReports(reports) : liveClusters;
+  const clusters = demo ? clusterReports(reports.filter((report) => report.districtId === districtId)) : liveClusters.filter((cluster) => cluster.districtId === districtId);
   const watchClusters = showExamples
     ? clusterReports(demoReports(districtId))
     : clusters;
@@ -161,17 +164,20 @@ export default function App() {
     return () => { cancelled = true; };
   }, [entryMode, authUser?.uid]);
   useEffect(() => {
-    if (!activeLocation || knownDistrict || demo) {
-      setApproximateCenter(undefined);
+    setMapPlace(undefined);
+    setMapLoading(false);
+    if (!activeLocation || demo || (page !== "community" && page !== "authority")) {
       return;
     }
     let cancelled = false;
+    setMapLoading(true);
     const query = new URLSearchParams({ state: activeLocation.state, district: activeLocation.district, locality: activeLocation.locality || "", pincode: activeLocation.pincode || "" });
-    request<WeatherSummary>(`weather?${query}`)
-      .then((weather) => { if (!cancelled) setApproximateCenter({ lat: weather.latitude, lon: weather.longitude }); })
-      .catch(() => { if (!cancelled) setApproximateCenter(undefined); });
+    request<CommunityMapPlace>(`locations/map?${query}`)
+      .then((place) => { if (!cancelled) setMapPlace(place); })
+      .catch(() => { if (!cancelled) setMapPlace(undefined); })
+      .finally(() => { if (!cancelled) setMapLoading(false); });
     return () => { cancelled = true; };
-  }, [activeLocation?.state, activeLocation?.district, activeLocation?.locality, activeLocation?.pincode, knownDistrict?.id]);
+  }, [activeLocation?.state, activeLocation?.district, activeLocation?.locality, activeLocation?.pincode, page, mapRetry]);
   useEffect(() => {
     const onPopState = () => {
       const next = pageFromPath();
@@ -220,6 +226,7 @@ export default function App() {
     let cancelled = false;
     setRegion(undefined);
     setBoundary(undefined);
+    setLiveClusters([]);
     setShowExamples(false);
     localStorage.setItem("agroman-district", districtId);
     context(districtId)
@@ -256,7 +263,7 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v3-1.2.0-${locale}`;
+    const localCopyKey = `agroman-ui-copy-v3-1.2.1-${locale}`;
     localStorage.setItem("agroman-locale", locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
@@ -737,13 +744,6 @@ export default function App() {
       <ChevronDown size={14} />
     </div>
   );
-  const mapDistrict = knownDistrict ?? (activeLocation && approximateCenter ? {
-    id: districtId,
-    name: activeLocation.district,
-    state: activeLocation.state,
-    lat: approximateCenter.lat,
-    lon: approximateCenter.lon,
-  } : undefined);
   return (
     <div ref={root} className="app">
       <a href="#content" className="skip">
@@ -1254,13 +1254,13 @@ export default function App() {
               </div>
             )}
             <div className="watch-grid">
-              {mapDistrict ? <DistrictMap
-                district={mapDistrict}
-                geometry={knownDistrict ? boundary : undefined}
+              {mapPlace ? <Suspense fallback={<div className="community-empty-map" role="status">{t("cityMapLoading")}</div>}><CityMap place={mapPlace} clusters={watchClusters} copy={copy} /></Suspense> : knownDistrict && (!activeLocation || demo) ? <DistrictMap
+                district={knownDistrict}
+                geometry={boundary}
                 clusters={watchClusters}
-                caption={knownDistrict ? t("mapCaption") : t("approximateMapCaption")}
-                ariaLabel={`${t("mapLabel")} ${mapDistrict.name}`}
-              /> : <div className="community-empty-map"><MapPin size={36} /><h2>{districtLabel}</h2><p>{t("noBoundary")}</p></div>}
+                caption={boundary ? t("mapCaption") : t("mapSketchCaption")}
+                ariaLabel={`${t("mapLabel")} ${knownDistrict.name}`}
+              /> : <div className="community-empty-map" role="status"><MapPin size={36} /><h2>{districtLabel}</h2><p>{mapLoading ? t("cityMapLoading") : demo ? t("noBoundary") : t("cityMapUnavailable")}</p>{!mapLoading && !demo && <button className="secondary" onClick={() => setMapRetry((value) => value + 1)}>{t("cityMapRetry")}</button>}</div>}
               <div className="incident-list">
                 {!watchClusters.length ? (
                   <p>{t("noReports")}</p>
@@ -1276,7 +1276,7 @@ export default function App() {
                         <MapPin size={14} />
                         {
                           districts.find((d) => d.id === cluster.districtId)
-                            ?.name
+                            ?.name ?? activeLocation?.district
                         }
                       </p>
                       <div className="incident-count">

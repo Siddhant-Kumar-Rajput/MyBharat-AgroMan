@@ -1,6 +1,18 @@
 # Phase 2 implementation status
 
-## Current release: v1.2.0 — 7 October 2026
+## Current release: v1.2.1 — city maps
+
+Community Watch now resolves a saved postal locality to its parent town and renders OpenStreetMap streets without depending on a weather forecast or imported district polygon. PIN 263139 / Anandpur resolves to Haldwani. A district fallback is labelled explicitly if the town is not indexed; failed lookups show retry rather than another district. Aggregated alerts remain district-scoped, not farm/locality locations. The old unreviewed rounded outline is removed.
+
+The user approved the additional map provider. Browser tile requests carry the viewed map area and normal request metadata (including IP), never an application PIN/locality, name, phone, raw GPS or farm record. Postal PIN and Open-Meteo place lookups use the previously approved provider path. The provider notice and privacy pages describe this. OSM attribution is visible; HTTP browser caching/referrer is preserved and no offline tile downloads/prefetch are provided. Automated browser checks mock tiles rather than crawl the provider. See [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/) and [Leaflet](https://leafletjs.com/).
+
+Town/block names are not proof of legal city boundaries. Provider place coverage and tile availability are not guaranteed. Model development remains unchanged in this map-fix release.
+
+Release validation: all builds and 65 unit/integration tests passed; the full desktop/mobile suite passed 31 checks (3 explicitly gated skips), followed by 8 targeted layout/community/localization regression checks. The deployed API passed PIN-to-Haldwani, manual Haldwani, Ludhiana and invalid-locality rejection checks using a temporary anonymous account, then deleted that account; no farmer records were written. A single current mobile viewport displayed real Haldwani street tiles with attribution and no horizontal overflow. Cloudflare and Firebase Hosting deployment completed. The original Phase 1 checkout remains at `8dac190fccf7e525e9b5d6c3b960e14046e8ee77` with its existing untracked directories unchanged.
+
+Separate security maintenance remains: npm audit reports 13 existing workspace dependency findings (1 critical, 10 high, 1 moderate, 1 low). The map install adds only Leaflet and its type packages to the lockfile; none of these added packages is listed in the findings. No unrelated or breaking dependency upgrades were attempted. Passing map tests is not a claim of security or agronomic production readiness.
+
+## Previous release: v1.2.0 — 7 October 2026
 
 The diary now uses a minimal field setup and a backend-computed outlook. It includes sowing/harvest transitions, daily one-tap updates, sourced planting-window screening, recent/forecast modeled rainfall, a reference water-balance signal and per-photo-consent Gemini observations. Detailed inputs, finance and exports are optional. Google sign-in permits persistence; phone verification is optional, superseding the historical gate described below.
 

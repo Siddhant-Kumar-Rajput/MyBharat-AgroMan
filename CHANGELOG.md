@@ -1,5 +1,14 @@
 # Release history
 
+## v1.2.1 — 7 October 2026
+
+- Resolve saved postal localities to their parent town for Community Watch; PIN 263139 / Anandpur uses Haldwani, not the Nainital hill town.
+- Decouple map-place lookup from weather forecasts and reviewed-boundary availability.
+- Add an attributed OpenStreetMap street map with mobile-sized zoom/recenter controls and explicit tile-failure/retry states. No GPS, identity, PIN or farm records are sent to the tile provider.
+- Validate geocoding against saved state/district; label a district fallback when a town is not indexed. No fabricated administrative outline or replacement district.
+- Keep aggregate alerts district-scoped, clearing stale alerts when the location changes.
+- Add English/Hindi map copy, updated provider disclosures and deterministic map/privacy/mobile tests using mocked tiles.
+
 ## v1.2.0 — 7 October 2026
 
 - Replace the form-first diary with a computed field outlook and optional detailed tools.

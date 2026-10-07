@@ -98,17 +98,8 @@ export function DistrictMap({
           </pattern>
         </defs>
         <rect className="geo-grid" width={width} height={height} />
-        {path ? (
+        {path && (
           <path className="district-boundary" d={path} fillRule="evenodd" />
-        ) : (
-          <rect
-            className="district-boundary fallback-boundary"
-            x="80"
-            y="55"
-            width="560"
-            height="300"
-            rx="90"
-          />
         )}
         {clusters.map((cluster) => {
           const [x, y] = project([cluster.lon, cluster.lat]);

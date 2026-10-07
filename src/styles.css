@@ -971,6 +971,20 @@ footer > span {
   overflow: hidden;
   border: 1px solid #d6ddc9;
 }
+.city-map { min-width: 0; overflow: hidden; border: 1px solid #d6ddc9; border-radius: 12px; background: #fffef9; isolation: isolate; }
+.city-map-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 18px; flex-wrap: wrap; }
+.city-map-heading h2 { font-size: 22px; margin: 0 0 4px; }
+.city-map-heading p { margin: 0; font-size: 13px; color: #536649; }
+.city-map-heading > span { font-size: 12px; background: #eaf0e3; color: #28462d; padding: 6px 10px; border-radius: 20px; }
+.city-map-frame { position: relative; }
+.city-map-canvas { height: clamp(300px, 50vh, 420px); width: 100%; z-index: 0; }
+.city-map-status { position: absolute; z-index: 1; top: 12px; left: 12px; right: 12px; padding: 12px; background: #fffef9f2; border-radius: 8px; box-shadow: 0 1px 8px #193b2a20; }
+.city-map-status p { margin: 0 0 8px; font-size: 14px; }
+.city-map-tools { display: flex; align-items: center; gap: 8px; padding: 10px 16px; flex-wrap: wrap; }
+.city-map-tools button { min-width: 44px; min-height: 44px; padding: 8px 12px; }
+.city-map-note { font-size: 13px; line-height: 1.5; padding: 0 18px; margin: 0 0 10px; }
+.city-map-provider { display: block; color: #536649; font-size: 12px; line-height: 1.5; padding: 0 18px 18px; }
+.city-map .leaflet-control-attribution { font-size: 11px; max-width: 100%; }
 .district-map svg {
   display: block;
   width: 100%;

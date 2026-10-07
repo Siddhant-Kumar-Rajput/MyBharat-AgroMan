@@ -32,6 +32,7 @@ import { hindi } from "../../src/lib/hi";
 import { indiaToday } from "../../shared/farm-intelligence";
 import { handleFarm } from "./farm";
 import { ApiError } from "./errors";
+import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/community-map";
 
 export interface Env {
   AI: Ai;
@@ -631,6 +632,29 @@ async function translateUi(env: Env, locale: string) {
 // Only approved approximate location goes to weather providers. Results are
 // returned to the caller; no coordinates, PINs or forecasts are persisted here.
 const fieldWeatherCache = new Map<string, { expires: number; value: Promise<WeatherSummary> }>();
+const communityPlaceCache = new Map<string, { expires: number; value: Promise<CommunityMapPlace> }>();
+async function communityMapPlace(location: z.infer<typeof approximateLocationSchema>) {
+  const key = JSON.stringify(location);
+  const cached = communityPlaceCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.value;
+  if (communityPlaceCache.size >= 64) communityPlaceCache.delete(communityPlaceCache.keys().next().value!);
+  const value = resolveCommunityMapPlace(location, {
+    postal: postalOfficesForPincode,
+    geocode: async (name) => {
+      const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+      url.search = new URLSearchParams({ name, count: "10", countryCode: "IN", language: "en" }).toString();
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new ApiError(502, "Map location lookup is temporarily unavailable.");
+      const payload = await response.json() as { results?: IndianGeocodeLocation[] };
+      return payload.results ?? [];
+    },
+  }).then((place) => {
+    if (!place) throw new ApiError(404, "No matching map place was found in your saved district.");
+    return place;
+  }).catch((error) => { communityPlaceCache.delete(key); throw error; });
+  communityPlaceCache.set(key, { expires: Date.now() + 5 * 60000, value });
+  return value;
+}
 async function fetchFieldWeather(location: z.infer<typeof approximateLocationSchema>): Promise<WeatherSummary> {
   // Bounded five-minute memory cache, not D1 or logs. Repeated quick taps do
   // not need three new provider calls. No identity or farm records in the key.
@@ -762,6 +786,15 @@ async function route(request: Request, env: Env) {
       sourceUrl: "https://api.postalpincode.in/",
       disclosure: "Only the six-digit PIN code was sent to the lookup provider.",
     });
+  }
+
+  if (request.method === "GET" && path === "locations/map") {
+    const location = approximateLocationSchema.parse({
+      state: url.searchParams.get("state"), district: url.searchParams.get("district"),
+      locality: url.searchParams.get("locality") || "", pincode: url.searchParams.get("pincode") || "",
+    });
+    await rateLimit(env, uid, "map-location", 60);
+    return json(request, env, await communityMapPlace(location));
   }
 
   if (request.method === "GET" && path === "weather") {

@@ -239,11 +239,14 @@ export function selectDistrictGeocodeMatch(
   location: Pick<FarmLocation, "state" | "district">,
 ) {
   const state = normalizedPlaceName(location.state);
-  const district = normalizedPlaceName(location.district);
+  // GeoNames sometimes adds the administrative label (e.g. "Ludhiana
+  // district"). Remove that suffix only, not meaningful words like East.
+  const districtName = (value: string) => normalizedPlaceName(value.trim().replace(/\s+district$/i, ""));
+  const district = districtName(location.district);
   return candidates.find((candidate) => {
     const candidateDistricts = [candidate.admin2, candidate.admin3, candidate.admin4]
       .filter((value): value is string => Boolean(value))
-      .map(normalizedPlaceName);
+      .map(districtName);
     return normalizedPlaceName(candidate.admin1 || "") === state && candidateDistricts.includes(district);
   }) ?? null;
 }
