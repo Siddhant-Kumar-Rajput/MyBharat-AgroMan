@@ -20,6 +20,7 @@ import {
   postalWeatherLocality,
   selectDistrictGeocodeMatch,
   type Context,
+  type FarmLocation,
   type CropHealthCase,
   type Diagnosis,
   type IndianGeocodeLocation,
@@ -33,6 +34,7 @@ import { indiaToday } from "../../shared/farm-intelligence";
 import { handleFarm } from "./farm";
 import { ApiError } from "./errors";
 import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/community-map";
+import { savedRegionReportPosition } from "./community";
 
 export interface Env {
   AI: Ai;
@@ -1431,7 +1433,8 @@ async function route(request: Request, env: Env) {
       .object({
         receipt: z.string().uuid(),
         consent: z.literal(true),
-        position: positionSchema,
+        position: positionSchema.optional(),
+        locationSource: z.enum(["gps", "saved_region"]).default("gps"),
       })
       .parse(await body(request));
     const receipt = await env.DB.prepare(
@@ -1455,8 +1458,19 @@ async function route(request: Request, env: Env) {
       throw new ApiError(400, "Diagnosis authorization expired.");
     if (receipt.used)
       throw new ApiError(409, "Observation already contributed.");
-    const districtId = await resolvePosition(env, input.position);
-    if (districtId !== receipt.district_id)
+    let reportPosition: { districtId: string; lat: number; lon: number };
+    if (input.locationSource === "saved_region") {
+      if (auth.provider === "anonymous") throw new ApiError(403, "Sign in to contribute from your saved farming region.");
+      if (input.position) throw new ApiError(400, "Saved-region observations do not accept GPS coordinates.");
+      const profile = await env.DB.prepare("SELECT state, district, locality, pincode FROM farmer_profiles WHERE subject_id = ?")
+        .bind(await subjectId(env, uid)).first<FarmLocation>();
+      reportPosition = await savedRegionReportPosition(receipt.district_id, profile, communityMapPlace);
+    } else {
+      if (!input.position) throw new ApiError(400, "A position is required for a GPS observation.");
+      reportPosition = { ...input.position, districtId: await resolvePosition(env, input.position) };
+    }
+    const districtId = reportPosition.districtId;
+    if (input.locationSource === "gps" && districtId !== receipt.district_id)
       throw new ApiError(
         400,
         "The photo observation must be in the selected district.",
@@ -1484,8 +1498,8 @@ async function route(request: Request, env: Env) {
         diagnosis.diseaseCode,
         diagnosis.name,
         diagnosis.confidence,
-        Math.round(input.position.lat * 100) / 100,
-        Math.round(input.position.lon * 100) / 100,
+        Math.round(reportPosition.lat * 100) / 100,
+        Math.round(reportPosition.lon * 100) / 100,
         Date.now(),
         Date.now() + 90 * 86400000,
       ),

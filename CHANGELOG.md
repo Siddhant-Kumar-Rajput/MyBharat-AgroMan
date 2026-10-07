@@ -1,5 +1,14 @@
 # Release history
 
+## v1.2.2 — 7 October 2026
+
+- Fix information-page hero styles accidentally resizing the shared header. Keep common header dimensions and footer grid across routes; add readable section navigation and a compact policy notice.
+- Repair farmer-story intrinsic grid widths, field/value wrapping and mobile controls. Preserve full-width shared chrome and use vertical field-fill reveals so animations do not overflow.
+- Generate explicitly synthetic Community Watch examples around any resolved saved town, including Haldwani. Add a session-only sample distress action for presentation; no examples are written to live reports.
+- Add counted, keyboard/touch-accessible markers, provenance-labelled popups, a status legend, list-to-map focus and a fit-all-signals control. Update markers when the live report feed changes.
+- Allow signed-in farmers to consent to server-authorized observations at their saved town/district centre, without transmitting GPS or requiring a pilot boundary. Validate the server-owned profile against the authorized receipt; retain guest GPS boundary checks and receipt/consent rules.
+- Add English/Hindi copy and regression tests for every story chapter, header dimensions, marker updates, and contribution authorization/storage/feed behavior in isolated D1.
+
 ## v1.2.1 — 7 October 2026
 
 - Resolve saved postal localities to their parent town for Community Watch; PIN 263139 / Anandpur uses Haldwani, not the Nainital hill town.

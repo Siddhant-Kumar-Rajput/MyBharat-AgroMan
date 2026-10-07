@@ -1,6 +1,18 @@
 # Phase 2 implementation status
 
-## Current release: v1.2.1 — city maps
+## Current release: v1.2.2 — mobile shell and community signals
+
+Information-page hero styles no longer target the shared navigation header. At the same viewport, the shared header is 72px tall up to 860px and 82px above that. Footer-linked pages use a contents navigation, readable stacked sections and a compact notice while retaining the shared footer. Story grids shrink correctly, use wrapped field values and mobile-sized controls, and reveal fields vertically to avoid transient horizontal overflow.
+
+Community Watch's explicit example switch generates local synthetic signals near a resolved city rather than relying on the six pilot district fixtures. The sample distress button is session-only and never posts an example to the live feed. Map markers display counts/status and open labelled details; lists can focus a marker and the map can frame all district signals. Newly received live aggregates update the marker layer without a reload.
+
+For authenticated farmers, an observation may use the centre of their server-owned saved town/district after explicit consent and a server-issued diagnosis receipt. The backend checks receipt ownership/expiry/reuse and the receipt district against that profile before lookup. It neither accepts GPS with this mode nor treats a self-reported saved region as an exact/verified farm position. Legacy guest GPS contributions still require a supported reviewed boundary. A single eligible observation is labelled an unverified observation, never a confirmed outbreak. A diary action or an insufficient AI photo does not automatically create a public signal.
+
+Model behavior, treatment policy and the original Phase 1 repository are not changed. Tests of the contribution route use an isolated local D1 database, synthetic receipts and test-only identity/provider mocks; no production diagnoses/reports are fabricated. Existing dependency-audit and model-validation limitations from previous releases remain.
+
+Release validation: frontend/functions/Worker builds pass; 75 unit/integration tests and 37 desktop/mobile browser checks pass (3 explicitly gated skips). The shared header's dimensions are checked across all six information pages at 320/390/768/1280px. All six story chapters are checked in English/Hindi at 320/390/768px using actual descendant bounds and scroll widths, not merely hidden body overflow. Mobile policy/story screenshots were visually inspected. The full local D1 route test verifies consent, receipt ownership/reuse, guest restrictions, exclusion of GPS in saved-region mode, rounded coordinates and immediate inclusion in the district feed. The original checkout remains at `8dac190fccf7e525e9b5d6c3b960e14046e8ee77` with its pre-existing untracked directories untouched.
+
+## Previous release: v1.2.1 — city maps
 
 Community Watch now resolves a saved postal locality to its parent town and renders OpenStreetMap streets without depending on a weather forecast or imported district polygon. PIN 263139 / Anandpur resolves to Haldwani. A district fallback is labelled explicitly if the town is not indexed; failed lookups show retry rather than another district. Aggregated alerts remain district-scoped, not farm/locality locations. The old unreviewed rounded outline is removed.
 

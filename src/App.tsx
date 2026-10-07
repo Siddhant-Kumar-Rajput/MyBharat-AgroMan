@@ -118,6 +118,8 @@ export default function App() {
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [boundary, setBoundary] = useState<DistrictGeometry>();
   const [showExamples, setShowExamples] = useState(false);
+  const [sampleReports, setSampleReports] = useState<Report[]>([]);
+  const [focusedSignal, setFocusedSignal] = useState<string>();
   const [activeLocation, setActiveLocation] = useState<FarmLocation>();
   const [mapPlace, setMapPlace] = useState<CommunityMapPlace>();
   const [mapLoading, setMapLoading] = useState(false);
@@ -143,7 +145,7 @@ export default function App() {
   const current = threads.find((thread) => thread.id === active);
   const clusters = demo ? clusterReports(reports.filter((report) => report.districtId === districtId)) : liveClusters.filter((cluster) => cluster.districtId === districtId);
   const watchClusters = showExamples
-    ? clusterReports(demoReports(districtId))
+    ? clusterReports([...demoReports(districtId, mapPlace ? { lat: mapPlace.latitude, lon: mapPlace.longitude } : undefined, t("sampleDiseaseName")), ...sampleReports.filter((report) => report.districtId === districtId)])
     : clusters;
   const syntheticWatch = demo || showExamples;
   const atLimit = current ? turns(current) >= MAX_TURNS : false;
@@ -228,6 +230,8 @@ export default function App() {
     setBoundary(undefined);
     setLiveClusters([]);
     setShowExamples(false);
+    setSampleReports([]);
+    setFocusedSignal(undefined);
     localStorage.setItem("agroman-district", districtId);
     context(districtId)
       .then((value) => {
@@ -263,7 +267,7 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v3-1.2.1-${locale}`;
+    const localCopyKey = `agroman-ui-copy-v3-1.2.2-${locale}`;
     localStorage.setItem("agroman-locale", locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
@@ -614,12 +618,16 @@ export default function App() {
         await request("reports/contribute", {
           receipt: consent.receipt,
           consent: true,
-          position: await currentPosition(),
+          ...(entryMode === "farmer" && activeLocation
+            ? { locationSource: "saved_region" }
+            : { locationSource: "gps", position: await currentPosition() }),
         });
         const result = await request<{
           clusters: ReturnType<typeof clusterReports>;
-        }>(`outbreaks/nearby?districtId=${districtId}`);
+        }>(`outbreaks/nearby?districtId=${encodeURIComponent(districtId)}`);
         setLiveClusters(result.clusters);
+        setShowExamples(false);
+        setFocusedSignal(result.clusters.find((cluster) => cluster.name === consent.diagnosis?.name)?.id);
       }
       setThreads((list) =>
         list.map((thread) => ({
@@ -1245,6 +1253,11 @@ export default function App() {
                     {showExamples ? t("showLive") : t("previewExamples")}
                   </button>
                 )}
+                {showExamples && mapPlace && <button className="secondary" disabled={sampleReports.length > 0} onClick={() => {
+                  const id = `demo-added-${districtId}`;
+                  setSampleReports([{ id, installation: "synthetic-presentation-farmer", districtId, crop: "RICE", diseaseCode: "DEMO_CONCERN", name: t("sampleConcernName"), confidence: 0.84, lat: mapPlace.latitude - 0.01, lon: mapPlace.longitude + 0.01, timestamp: Date.now(), origin: "demo" }]);
+                  setFocusedSignal(id);
+                }}>{sampleReports.length ? t("sampleDistressAdded") : t("addSampleDistress")}</button>}
               </div>
             </div>
             {syntheticWatch && (
@@ -1254,7 +1267,7 @@ export default function App() {
               </div>
             )}
             <div className="watch-grid">
-              {mapPlace ? <Suspense fallback={<div className="community-empty-map" role="status">{t("cityMapLoading")}</div>}><CityMap place={mapPlace} clusters={watchClusters} copy={copy} /></Suspense> : knownDistrict && (!activeLocation || demo) ? <DistrictMap
+              {mapPlace ? <Suspense fallback={<div className="community-empty-map" role="status">{t("cityMapLoading")}</div>}><CityMap place={mapPlace} clusters={watchClusters} copy={copy} focusedSignal={focusedSignal} onSignalFocus={setFocusedSignal} /></Suspense> : knownDistrict && (!activeLocation || demo) ? <DistrictMap
                 district={knownDistrict}
                 geometry={boundary}
                 clusters={watchClusters}
@@ -1284,6 +1297,7 @@ export default function App() {
                         <span>{t("reports")}</span>
                       </div>
                       <small>{t("reportNotice")}</small>
+                      {mapPlace && <button className="text-button" onClick={() => setFocusedSignal(cluster.id)}>{t("viewSignalOnMap")}</button>}
                     </article>
                   ))
                 )}
@@ -1309,6 +1323,7 @@ export default function App() {
             <ShieldCheck size={30} />
             <h2 id="consent-title">{t("report")}</h2>
             <p>{t("consent")}</p>
+            {!demo && entryMode === "farmer" && activeLocation && <p>{t("savedRegionConsent")}</p>}
             {demo && <p className="demo-banner">{t("synthetic")}</p>}
             <div className="modal-actions">
               <button

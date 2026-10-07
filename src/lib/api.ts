@@ -180,8 +180,8 @@ export async function advise(input: AdviceRequest): Promise<Answer> {
     diagnosis: null,
   };
 }
-export function demoReports(districtId: string): Report[] {
-  const d = districts.find((d) => d.id === districtId);
+export function demoReports(districtId: string, center?: { lat: number; lon: number }, name = "Leaf blight"): Report[] {
+  const d = center ?? districts.find((d) => d.id === districtId);
   if (!d) return [];
   return [0, 1, 2, 3].map((i) => ({
     id: `seed-${districtId}-${i}`,
@@ -189,7 +189,7 @@ export function demoReports(districtId: string): Report[] {
     districtId,
     crop: "RICE",
     diseaseCode: "LEAF_BLIGHT",
-    name: "Leaf blight",
+    name,
     confidence: 0.84,
     lat: d.lat + i * 0.008,
     lon: d.lon + i * 0.006,

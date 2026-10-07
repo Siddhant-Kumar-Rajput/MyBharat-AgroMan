@@ -33,3 +33,21 @@ test("Hindi city map keeps localized controls and provider attribution", async (
   await expect(page.locator(".city-map-status")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test("Haldwani sample and subsequently added observation have tappable, counted map markers", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: tile }));
+  await page.goto("/e2e/fixtures/city-map.html");
+  await page.getByRole("button", { name: "Preview example signals" }).click();
+  await expect(page.locator(".signal-marker")).toHaveCount(1);
+  await expect(page.locator(".signal-marker-count")).toHaveText("4");
+  await page.locator(".signal-marker").click();
+  await expect(page.locator(".leaflet-popup-content")).toContainText("Leaf concern · sample");
+  await expect(page.locator(".leaflet-popup-content")).toContainText("Synthetic");
+  await page.getByRole("button", { name: "Show on map", exact: true }).click();
+  await expect(page.locator(".signal-marker")).toHaveCount(2);
+  await expect(page.locator(".leaflet-popup-content")).toHaveCount(1);
+  await expect(page.locator(".leaflet-popup-content")).toContainText("Test observation");
+  await expect(page.locator(".leaflet-popup-content")).toContainText("Contributed observation · unverified");
+  await page.getByRole("button", { name: "Show all signals" }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

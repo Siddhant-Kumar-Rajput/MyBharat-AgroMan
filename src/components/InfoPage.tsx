@@ -17,12 +17,18 @@ const contentKeys: Record<InfoPageKind, { title: keyof Copy; intro: keyof Copy; 
 export function InfoPage({ copy: t, locale, onLocaleChange, kind, onBack, onHome }: Props) {
   const content = contentKeys[kind];
   return (
-    <main className="info-page">
+    <div className="info-page">
+      <a className="skip" href="#content">{t.skip}</a>
       <SiteHeader copy={t} locale={locale} onLocaleChange={onLocaleChange} onHome={onHome} menuActions={[{ label: t.back, onClick: onBack }]} />
-      <header><ShieldCheck size={28} /><h1>{t[content.title]}</h1><p>{t[content.intro]}</p><time>{t.policyUpdated}</time></header>
-      <section>{content.sections.map(([title, body]) => <article key={String(title)}><h2>{t[title]}</h2><p>{t[body]}</p></article>)}</section>
-      <aside><strong>{t.policyNoticeTitle}</strong><p>{t.policyNoticeCopy}</p></aside>
+      <main id="content">
+        <header className="info-hero"><h1>{t[content.title]}</h1><p>{t[content.intro]}</p><time>{t.policyUpdated}</time></header>
+        <div className="info-layout">
+          <nav className="info-contents" aria-label={t.pageContents}><strong>{t.pageContents}</strong>{content.sections.map(([title], index) => <a key={title} href={`#${kind}-${index}`}>{t[title]}</a>)}</nav>
+          <section className="info-sections" aria-label={t[content.title]}>{content.sections.map(([title, body], index) => <article id={`${kind}-${index}`} key={String(title)}><h2>{t[title]}</h2><p>{t[body]}</p></article>)}</section>
+        </div>
+        <aside className="info-notice"><ShieldCheck size={22} aria-hidden="true" /><div><strong>{t.policyNoticeTitle}</strong><p>{t.policyNoticeCopy}</p></div></aside>
+      </main>
       <SiteFooter copy={t} />
-    </main>
+    </div>
   );
 }

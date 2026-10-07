@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveCommunityMapPlace } from "../shared/community-map";
+import { demoReports } from "../src/lib/api";
+import { clusterReports } from "../shared/domain";
 
 const location = { state: "Uttarakhand", district: "Nainital", locality: "Anandpur", pincode: "263139" };
 const office = { ...location, name: "Anandpur", block: "Haldwani" };
 const haldwani = { name: "Haldwani", latitude: 29.22254, longitude: 79.5286, admin1: "Uttarakhand", admin2: "Nainital" };
 
 describe("community place resolution, independent of weather and reviewed boundaries", () => {
+  it("creates explicit local synthetic signals for a non-pilot city", () => {
+    const reports = demoReports("IN:Uttarakhand:Nainital", { lat: 29.22, lon: 79.53 }, "Sample concern");
+    expect(reports).toHaveLength(4);
+    expect(reports.every((report) => report.origin === "demo" && report.districtId === "IN:Uttarakhand:Nainital")).toBe(true);
+    expect(clusterReports(reports)[0]).toMatchObject({ count: 4, status: "potential", origin: "demo" });
+    expect(clusterReports(reports)[0].lat).toBeCloseTo(29.232);
+  });
   it("maps a PIN locality to Haldwani rather than the Nainital hill town", async () => {
     const geocode = vi.fn(async () => [haldwani]);
     const result = await resolveCommunityMapPlace(location, { postal: async () => [office], geocode });
