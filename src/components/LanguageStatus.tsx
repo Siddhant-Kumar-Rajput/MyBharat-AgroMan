@@ -5,6 +5,7 @@ export function LanguageStatus({
   busy,
   failed,
   progress,
+  background,
   machine,
   onRetry,
 }: {
@@ -12,6 +13,7 @@ export function LanguageStatus({
   busy: boolean;
   failed: boolean;
   progress: number;
+  background: boolean;
   machine: boolean;
   onRetry: () => void;
 }) {
@@ -21,7 +23,6 @@ export function LanguageStatus({
       {busy && (
         <p role="status">
           {t.translationWorking}
-          {progress > 0 ? ` · ${progress}%` : ""}
         </p>
       )}
       {failed && (
@@ -35,6 +36,7 @@ export function LanguageStatus({
       {machine && !busy && !failed && (
         <InfoHint copy={t} title={t.language}>
           <p>{t.languageMachineNote}</p>
+          {background && <p>{t.languageBackground.replace("{percent}", String(progress))}</p>}
         </InfoHint>
       )}
     </div>

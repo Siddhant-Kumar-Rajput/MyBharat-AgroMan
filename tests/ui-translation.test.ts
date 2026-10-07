@@ -42,6 +42,25 @@ function fixture() {
   return { env, run, rows };
 }
 describe("resumable static UI translation", () => {
+  it("translates just requested page keys without waiting for the rest of the catalog", async () => {
+    const { env, run } = fixture();
+    const keys = ["entryHeadlineA", "entryHeadlineB", "continueGuest"];
+    const result = await translateUi(env, "ta", true, keys);
+    expect(result).toMatchObject({ status: "complete" });
+    expect("copy" in result && Object.keys(result.copy)).toEqual(keys);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][1].text).toEqual(
+      keys.map((key) => english[key as keyof typeof english]),
+    );
+    await translateUi(env, "ta", true, keys);
+    expect(run).toHaveBeenCalledTimes(1);
+    await expect(
+      translateUi(env, "ta", true, ["private farmer text"]),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(translateUi(env, "ta", true, [])).rejects.toMatchObject({
+      status: 422,
+    });
+  });
   it("covers every listed Indic locale with the provider's documented script codes", () => {
     for (const [locale] of languages)
       if (locale !== "en") expect(uiTranslationLocales).toHaveProperty(locale);

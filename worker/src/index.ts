@@ -33,7 +33,7 @@ import { handleFarm } from "./farm";
 import { ApiError } from "./errors";
 import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/community-map";
 import { savedRegionReportPosition } from "./community";
-import { translateUi } from "./ui-translation";
+import { isUiKey, translateUi } from "./ui-translation";
 
 export interface Env {
   AI: Ai;
@@ -1457,11 +1457,11 @@ async function route(request: Request, env: Env) {
     });
   }
   if (request.method === "POST" && path === "translate/ui") {
-    const { locale, incremental } = z
-      .object({ locale: localeSchema, incremental: z.boolean().optional().default(false) }).strict()
+    const { locale, incremental, keys } = z
+      .object({ locale: localeSchema, incremental: z.boolean().optional().default(false), keys: z.array(z.string().max(80).refine(isUiKey)).min(1).max(96).optional() }).strict()
       .parse(await body(request));
     await rateLimit(env, uid, "translation", 200);
-    return json(request, env, await translateUi(env, locale, incremental));
+    return json(request, env, await translateUi(env, locale, incremental, keys));
   }
   if (request.method === "POST" && path === "speech/synthesize") {
     const input = z

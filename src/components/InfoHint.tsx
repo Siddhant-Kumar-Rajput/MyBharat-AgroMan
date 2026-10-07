@@ -34,7 +34,7 @@ export function InfoHint({
         aria-controls={id}
         onClick={() => setOpen(!open)}
       >
-        <Info size={18} aria-hidden="true" />
+        <Info size={15} aria-hidden="true" />
       </button>
       {open && (
         <div

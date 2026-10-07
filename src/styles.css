@@ -2283,8 +2283,9 @@ footer > span {
 .site-menu-information a { display: flex; align-items: center; min-height: 44px; font: inherit; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: normal; color: #214833; text-decoration: none; overflow-wrap: anywhere; }
 .site-menu nav button { font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: normal; }
 .site-menu-information { gap: 0; }
-.info-hint { width: 100%; margin: 7px 0 12px; }
-.info-hint .info-hint-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 9px; border-radius: 50%; border: 1px solid #c5d3be; background: #f5f8ef; color: #285338; vertical-align: middle; }
+.info-hint { width: 100%; margin: 0 0 4px; }
+.info-hint .info-hint-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 14px; border: 0; background: transparent; color: #285338; vertical-align: middle; }
+.info-hint-toggle:focus-visible { outline: 2px solid #315d3e; outline-offset: -6px; border-radius: 50%; }
 .info-hint-panel { width: 100%; margin-top: 8px; padding: 16px; background: #eef4e8; border: 1px solid #c8d7be; border-radius: 12px; animation: workspace-in .18s ease-out; overflow-wrap: anywhere; }
 .info-hint-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
 .info-hint-heading button { display: grid; place-items: center; width: 44px; min-height: 44px; flex-shrink: 0; border: 0; border-radius: 50%; background: transparent; color: #285338; }

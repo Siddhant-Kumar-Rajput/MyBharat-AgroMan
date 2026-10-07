@@ -1,5 +1,13 @@
 # Release history
 
+## v1.4.1 — 8 October 2026
+
+- Prioritize the open page's static language labels and display validated batches immediately; load other pages quietly in the background. Recheck priorities on navigation and menu/panel use; ignore old-language responses.
+- Add whitelisted-key translation requests without changing the existing catalog endpoint contract, exact-source browser caches and retry without erasing completed text. Explain temporary English fallbacks.
+- Make information icons visually compact (15px, no large coloured shell), preserving transparent 44px mobile touch targets and keyboard access.
+- Add regression tests for page-first scheduling, route reprioritization, failures, cancellation, scoped provider requests and compact icon appearance.
+- Document the current limitations of earnings/export features and a sourced net-proceeds/export-readiness roadmap; do not claim a live market, demand or buyer integration.
+
 ## v1.4.0 — 7 October 2026
 
 - Normalize visitor menu action/information typography and 44px information-link targets.

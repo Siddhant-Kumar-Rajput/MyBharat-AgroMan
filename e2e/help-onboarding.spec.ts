@@ -12,7 +12,7 @@ test("long-script landing headlines wrap inside the mobile content column", asyn
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript((source) => {
     localStorage.setItem("agroman-locale", "ta");
-    localStorage.setItem("agroman-ui-copy-v5-1.4.0-ta", JSON.stringify({ ...source, entryHeadlineA: "ஒவ்வொரு பருவத்தையும் புரிந்துகொள்ளுங்கள்", entryHeadlineB: "ஒவ்வொரு பதிவையும் சொந்தமாக்குங்கள்" }));
+    localStorage.setItem("agroman-ui-copy-v6-ta", JSON.stringify({ source, copy: { ...source, entryHeadlineA: "ஒவ்வொரு பருவத்தையும் புரிந்துகொள்ளுங்கள்", entryHeadlineB: "ஒவ்வொரு பதிவையும் சொந்தமாக்குங்கள்" } }));
   }, english);
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "ta");
@@ -166,6 +166,11 @@ test("information opens inline with keyboard dismissal while planning consent st
     exact: true,
   });
   await expect(help).toHaveAttribute("aria-expanded", "false");
+  const size = await help.evaluate((node) => ({ target: node.getBoundingClientRect().width, icon: node.querySelector("svg")?.getBoundingClientRect().width, background: getComputedStyle(node).backgroundColor, border: getComputedStyle(node).borderWidth }));
+  expect(size.target).toBeGreaterThanOrEqual(44);
+  expect(size.icon).toBe(15);
+  expect(size.background).toBe("rgba(0, 0, 0, 0)");
+  expect(size.border).toBe("0px");
   const button = page.getByRole("button", {
     name: "Create my next-step plan",
     exact: true,

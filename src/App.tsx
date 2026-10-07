@@ -55,7 +55,7 @@ import {
 } from "./lib/api";
 import type { User } from "firebase/auth";
 import { readThreads, saveThreads } from "./lib/storage";
-import { english, type Copy } from "./lib/i18n";
+import { type Copy } from "./lib/i18n";
 import { speakText, stopSpeech } from "./lib/speech";
 import { formatMetric } from "./lib/format";
 import { DistrictMap } from "./components/DistrictMap";
@@ -69,7 +69,7 @@ import { InfoPage, type InfoPageKind } from "./components/InfoPage";
 import { MobileNavigation, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import { Onboarding } from "./components/Onboarding";
 import { LanguageStatus } from "./components/LanguageStatus";
-import { validCatalog, type UiTranslationResult } from "../shared/localization";
+import { usePageLanguage } from "./lib/use-page-language";
 import type { CommunityMapPlace } from "../shared/community-map";
 const CityMap = lazy(() => import("./components/CityMap"));
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -102,13 +102,9 @@ export default function App() {
     const stored = localStorage.getItem("agroman-locale");
     return languages.some((l) => l[0] === stored) ? stored! : "en";
   });
-  const [copy, setCopy] = useState<Copy>(english);
-  const [languageBusy, setLanguageBusy] = useState(false);
-  const [languageFailed, setLanguageFailed] = useState(false);
-  const [languageProgress, setLanguageProgress] = useState(0);
-  const [languageRetry, setLanguageRetry] = useState(0);
   const [languageChosen, setLanguageChosen] = useState(() => localStorage.getItem("agroman-language-chosen") === "yes");
   const [storyMode, setStoryMode] = useState(false);
+  const { copy, languageBusy, languageFailed, languageBackground, languageProgress, retryLanguage } = usePageLanguage(locale, `${entryMode}:${page}:${languageChosen}:${storyMode}`, !demo);
   const [tourOpen, setTourOpen] = useState(false);
   const [tourDone, setTourDone] = useState(() => localStorage.getItem("agroman-onboarding-v1") === "done");
   const [error, setError] = useState("");
@@ -273,69 +269,6 @@ export default function App() {
       cancelled = true;
     };
   }, [districtId, entryMode]);
-  useEffect(() => {
-    let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v5-1.4.0-${locale}`;
-    localStorage.setItem("agroman-locale", locale);
-    const setDocumentLanguage = (language: string) => { document.documentElement.lang = language; document.documentElement.dir = ["ur", "ks", "sd"].includes(language) ? "rtl" : "ltr"; };
-    let cachedCopy: Copy | undefined;
-    if (locale !== "en") {
-      try {
-        const cached = localStorage.getItem(localCopyKey);
-        if (cached) {
-          const candidate = JSON.parse(cached) as Copy;
-          if (validCatalog(english, candidate)) cachedCopy = candidate;
-        }
-      } catch {
-        localStorage.removeItem(localCopyKey);
-      }
-    }
-    setCopy(cachedCopy ?? english);
-    setDocumentLanguage(cachedCopy ? locale : "en");
-    setLanguageBusy(false); setLanguageFailed(false); setLanguageProgress(0);
-    if (locale === "hi") {
-      setLanguageBusy(!cachedCopy);
-      void import("./lib/hi").then(({ hindi }) => {
-        if (!cancelled) { setCopy(hindi); setDocumentLanguage("hi"); setLanguageBusy(false); localStorage.setItem(localCopyKey, JSON.stringify(hindi)); }
-      }).catch(() => { if (!cancelled) { setLanguageBusy(false); setLanguageFailed(true); } });
-      return () => { cancelled = true; };
-    }
-    if (locale !== "en" && !demo) {
-      setLanguageBusy(!cachedCopy);
-      const loadCopy = async () => {
-        for (let attempt = 0; attempt < 16; attempt++) {
-          if (cancelled) return undefined;
-          const result = await request<UiTranslationResult<Copy>>("translate/ui", { locale, incremental: true });
-          if (cancelled) return undefined;
-          if (result.status === "complete") {
-            if (!validCatalog(english, result.copy)) throw new Error("Incomplete UI catalog");
-            return result.copy;
-          }
-          if (result.status !== "pending" || !Number.isFinite(result.completed) || !Number.isFinite(result.total) || result.total <= 0) throw new Error("Invalid translation progress");
-          setLanguageProgress(Math.round(100 * result.completed / result.total));
-        }
-        throw new Error("Translation needs another attempt");
-      };
-      if (cachedCopy) return () => { cancelled = true; };
-      loadCopy()
-        .then((value) => {
-          if (!cancelled && value) {
-            setCopy(value);
-            setDocumentLanguage(locale);
-            localStorage.setItem(localCopyKey, JSON.stringify(value));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setLanguageFailed(true);
-        })
-        .finally(() => {
-          if (!cancelled) setLanguageBusy(false);
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [locale, languageRetry]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [current?.messages.length, busy]);
@@ -727,7 +660,7 @@ export default function App() {
     : (["advisor", "community"] as Page[]).map((item) => ({ label: t(item as keyof Copy), active: page === item, onClick: () => go(item) }));
   const mobileNavigation = entryMode === "farmer" ? <MobileNavigation copy={copy} items={mainItems.map((item, index) => ({ ...item, label: [copy.home, copy.navAdvisory, copy.navDiary, copy.navCommunity][index] }))} /> : undefined;
   const tour = tourOpen ? <Onboarding copy={copy} farmer={entryMode === "farmer"} onClose={() => setTourOpen(false)} onFinish={() => { setTourOpen(false); if (entryMode === "farmer") { localStorage.setItem("agroman-onboarding-v1", "done"); setTourDone(true); go("farmAdvisor"); } }} /> : undefined;
-  const languageNotice = <LanguageStatus copy={copy} busy={languageBusy} failed={languageFailed} progress={languageProgress} machine={!demo && locale !== "en" && locale !== "hi"} onRetry={() => setLanguageRetry((value) => value + 1)} />;
+  const languageNotice = <LanguageStatus copy={copy} busy={languageBusy} failed={languageFailed} progress={languageProgress} background={languageBackground} machine={!demo && locale !== "en" && locale !== "hi"} onRetry={retryLanguage} />;
   const sharedHeader = <SiteHeader copy={copy} locale={locale} onLocaleChange={setLocale} onHome={homeAction}
     items={entryMode === "visitor" ? [] : mainItems}
     primaryAction={entryMode === "visitor" ? { label: copy.googleAccess, onClick: () => void enterWithGoogle().catch((e) => setError(e.message)) } : undefined}

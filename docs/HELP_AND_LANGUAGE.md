@@ -1,4 +1,4 @@
-# Compact help, onboarding and languages — v1.4.0
+# Compact help, onboarding and languages — v1.4.1
 
 ## Visible first-use help
 
@@ -24,15 +24,23 @@ readable as documents.
   the documented IndicTrans2 script codes in `shared/localization.ts`.
 - Other languages use the configured Cloudflare model. They are machine
   translated, not certified by native agricultural-language reviewers.
-- Each UI request translates at most 96 unique static strings. The server caches
-  successful source/translation pairs and atomically merges them in D1; progress
-  survives a provider failure or another visitor's request. Catalog additions
-  only require new/changed source strings, not every previous translation.
-- Only a complete catalog with intact interpolation tokens is displayed. Names,
-  day counts and similar placeholders remain values inserted by the app.
-- During a cold load English stays visible with progress. Failure shows an
-  explicit retry action. HTML language/direction matches the displayed catalog,
-  not a failed requested language. Complete browser caches skip provider calls.
+- The browser observes which static copy keys the open page actually uses,
+  including newly opened menus and panels. It requests those first in batches
+  of at most 24 keys and displays each validated batch immediately. Remaining
+  pages load through small background batches. Navigation gets priority before
+  the next batch; an already-running request may finish first.
+- The server accepts only existing catalog keys (maximum 96 per request), never
+  arbitrary caller text. The existing full-catalog contract remains compatible.
+  Cached exact-source pairs are atomically merged in D1. Browser caches store
+  source/translation pairs, so unchanged labels survive later catalog edits.
+- Each returned label must preserve exact interpolation tokens. Names and counts
+  are inserted locally, not submitted to the translation provider.
+- The interface may temporarily mix translated labels and English fallbacks.
+  An explicit current-page loading notice and machine-translation disclosure
+  explain this. A failure does not erase completed translations; retry resumes
+  missing labels. Switching languages ignores the old session's late response.
+- Hindi and English still need no inference. Background activity never blocks
+  navigation or the language chooser. No guaranteed cold-load latency is claimed.
 - No farmer identity, location, photos or record values are submitted for UI
   translation; only the application's static English copy is sent.
 
@@ -56,3 +64,6 @@ an explicit opt-in (`tam_Taml all`), not a normal browser or unit test.
 
 See `EXPERT_REVIEW_ACCESS.md` for owner-managed reviewer setup and the remaining
 limitations of live case escalation/delivery.
+
+The visible information icon is now 15px without a large coloured button shell;
+the transparent 44px touch target remains accessible on mobile.

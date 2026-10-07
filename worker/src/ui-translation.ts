@@ -10,20 +10,44 @@ import type { Env } from "./index";
 import { ApiError } from "./errors";
 
 // Cache reviewed UI source strings, never caller text or identity. Completed
-// batches survive provider outages and catalog additions. Only complete catalogs
-// are displayed; partial results never masquerade as a translated interface.
+// batches survive provider outages and catalog additions. Page requests contain
+// only whitelisted static keys; they never translate caller text or record values.
+export const isUiKey = (key: string) => Object.hasOwn(english, key);
 type CachedStrings = Record<string, string>;
 const inFlight = new Map<
   string,
-  Promise<UiTranslationResult<typeof english>>
+  Promise<UiTranslationResult<Record<string, string>>>
 >();
 async function translate(
   env: Env,
   locale: string,
   incremental: boolean,
-): Promise<UiTranslationResult<typeof english>> {
+  keys?: string[],
+): Promise<UiTranslationResult<Record<string, string>>> {
+  if (
+    keys &&
+    (!keys.length || keys.length > 96 || keys.some((key) => !isUiKey(key)))
+  )
+    throw new ApiError(422, "Only supported static UI keys can be translated.");
+  const source = keys
+    ? Object.fromEntries(
+        keys.map((key) => [key, english[key as keyof typeof english]]),
+      )
+    : english;
   if (locale === "en" || locale === "hi")
-    return { status: "complete", copy: locale === "hi" ? hindi : english };
+    return {
+      status: "complete",
+      copy: keys
+        ? Object.fromEntries(
+            keys.map((key) => [
+              key,
+              (locale === "hi" ? hindi : english)[key as keyof typeof english],
+            ]),
+          )
+        : locale === "hi"
+          ? hindi
+          : english,
+    };
   const target =
     uiTranslationLocales[locale as keyof typeof uiTranslationLocales];
   if (!target)
@@ -44,7 +68,7 @@ async function translate(
   } catch {
     /* Rebuild an invalid UI cache, not farmer data. */
   }
-  const values = [...new Set(Object.values(english))];
+  const values = [...new Set(Object.values(source))];
   const usable = (source: string) =>
     typeof store[source] === "string" &&
     !!store[source].trim() &&
@@ -137,9 +161,9 @@ async function translate(
   if (completed < values.length)
     return { status: "pending", completed, total: values.length };
   const copy = Object.fromEntries(
-    Object.entries(english).map(([key, source]) => [key, store[source]]),
+    Object.entries(source).map(([key, source]) => [key, store[source]]),
   );
-  if (!validCatalog(english, copy))
+  if (!validCatalog(source, copy))
     throw new ApiError(502, "UI translation was incomplete.");
   return { status: "complete", copy: copy as typeof english };
 }
@@ -147,11 +171,12 @@ export async function translateUi(
   env: Env,
   locale: string,
   incremental = false,
+  keys?: string[],
 ) {
-  const key = `${env.FIREBASE_PROJECT_ID}:${locale}:${incremental}`;
+  const key = `${env.FIREBASE_PROJECT_ID}:${locale}:${incremental}:${keys ? [...new Set(keys)].sort().join(",") : "all"}`;
   let pending = inFlight.get(key);
   if (!pending) {
-    pending = translate(env, locale, incremental).finally(() =>
+    pending = translate(env, locale, incremental, keys).finally(() =>
       inFlight.delete(key),
     );
     inFlight.set(key, pending);
