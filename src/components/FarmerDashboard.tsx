@@ -7,6 +7,7 @@ import { demo, request } from "../lib/api";
 import { loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import { LocationFields } from "./LocationFields";
 import { WeatherCard } from "./WeatherCard";
+import { InfoHint } from "./InfoHint";
 
 type DashboardPage = "advisor" | "farmAdvisor" | "records" | "community";
 type Props = {
@@ -16,11 +17,13 @@ type Props = {
   onNavigate: (page: DashboardPage) => void;
   onError: (message: string) => void;
   onLocationChange?: (location: FarmLocation) => void;
+  onTour: () => void;
+  showTour: boolean;
 };
 
 const emptyState: Phase2State = { plots: [], cycles: [], events: [], ledger: [], cases: [], outcomes: [] };
 
-export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, onLocationChange }: Props) {
+export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, onLocationChange, onTour, showTour }: Props) {
   const [state, setState] = useState<Phase2State>(emptyState);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -150,10 +153,12 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
         <div>
           <p className="eyebrow">{t.farmerDashboard}</p>
           <h1 id="dashboard-title">{t.dashboardWelcome.replace("{name}", displayName)}</h1>
-          <p>{t.dashboardCopy}</p>
+          <InfoHint copy={t} title={t.farmerDashboard}><p>{t.dashboardCopy}</p></InfoHint>
         </div>
         <span className="dashboard-season"><Leaf size={18} />{t.dashboardSeason}</span>
       </div>
+
+      {showTour && <div className="tour-welcome"><div><strong>{t.tourWelcome}</strong><p>{t.tourWelcomeCopy}</p></div><button className="secondary" onClick={onTour}>{t.quickTour}</button></div>}
 
       <div className="dashboard-grid">
         <article className="dashboard-card profile-card">
@@ -169,7 +174,7 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
             <h2>{displayName}</h2>
             <p>{user?.email || t.googleAccount}</p>
             {state.profile && <p className="profile-location"><MapPin size={15} />{[state.profile.locality, state.profile.district, state.profile.state].filter(Boolean).join(", ")}</p>}
-            <small>{t.sessionPhotoNotice}</small>
+            <InfoHint copy={t} title={t.profilePhoto}><p>{t.sessionPhotoNotice}</p></InfoHint>
           </div>
           <button className="dashboard-link" onClick={() => setEditing((value) => !value)}>{editing ? t.cancel : t.editProfile}<ArrowUpRight size={16} /></button>
         </article>
@@ -177,9 +182,8 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
         <article className="dashboard-card account-card">
           <div className="card-label"><CheckCircle2 size={15} />{t.accountStatus}</div>
           <h2>{t.googleSignedIn}</h2>
-          <p>{t.googleRecordAccess}</p>
+          <InfoHint copy={t} title={t.accountStatus}><p>{t.googleRecordAccess}</p><p>{phoneStatus.verified ? t.phonePrivacy : t.phoneOptionalCopy}</p></InfoHint>
           <div className={phoneStatus.verified ? "account-pill linked" : "account-pill"}><Phone size={14} />{phoneStatus.verified ? t.phoneVerifiedEnding.replace("{last4}", phoneStatus.last4 || "") : t.phoneOptional}</div>
-          <small>{phoneStatus.verified ? t.phonePrivacy : t.phoneOptionalCopy}</small>
           {!phoneStatus.verified && phoneStatus.configured && (
             <div className="phone-verification">
               <strong>{t.phoneVerifyAction}</strong>

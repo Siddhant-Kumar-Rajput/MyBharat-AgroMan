@@ -32,6 +32,7 @@ import { demo, prepareImage, request } from "../lib/api";
 import { phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
 import { FieldPlanner } from "./FieldPlanner";
+import { InfoHint } from "./InfoHint";
 
 type Outlook = FieldOutlook & {
   actions: QuickAction[];
@@ -825,10 +826,7 @@ export function FarmIntelligence({
                       {demo ? t.synthetic : outlook.weather.location} ·{" "}
                       {outlook.weather.observedAt}
                     </small>
-                    <details className="field-explanation">
-                      <summary>{t.smartExplanation}</summary>
-                      <p className="field-note">{t.smartWeatherLimit}</p>
-                    </details>
+                    <InfoHint copy={t} title={t.smartWeatherTitle}><p>{t.smartWeatherLimit}</p></InfoHint>
                   </>
                 ) : (
                   <p>{t.smartWeatherUnavailable}</p>
@@ -883,7 +881,7 @@ export function FarmIntelligence({
                           </article>
                         ))}
                       </div>
-                      <p className="field-note">{t.smartCalendarLimit}</p>
+                      <InfoHint copy={t} title={t.smartNextCrop}><p>{t.smartCalendarLimit}</p></InfoHint>
                     </>
                   )}
                   <button
@@ -944,7 +942,7 @@ export function FarmIntelligence({
                       <Camera size={21} />
                       {t.smartPhotoTitle}
                     </h3>
-                    <p>{t.smartPhotoCopy}</p>
+                    <InfoHint copy={t} title={t.smartPhotoTitle}><p>{t.smartPhotoCopy}</p><p>{t.smartPhotoLimit}</p></InfoHint>
                     {demo ? (
                       <p className="field-note">{t.smartDemoPhoto}</p>
                     ) : (
@@ -1018,11 +1016,10 @@ export function FarmIntelligence({
                         </small>
                       </div>
                     )}
-                    <p className="field-note">{t.smartPhotoLimit}</p>
                   </section>
                   <section className="field-panel">
                     <h3>{t.smartHarvestTitle}</h3>
-                    <p>{t.smartHarvestCopy}</p>
+                    <InfoHint copy={t} title={t.smartHarvestTitle}><p>{t.smartHarvestCopy}</p></InfoHint>
                     <button
                       className="secondary"
                       disabled={busy}

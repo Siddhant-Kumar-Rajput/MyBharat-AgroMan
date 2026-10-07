@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { Miniflare } from "miniflare";
 import { handleFarm } from "../worker/src/farm";
 import type { Env } from "../worker/src/index";
+import { translateUi } from "../worker/src/ui-translation";
+import { english } from "../src/lib/i18n";
 
 let runtime: Miniflare;
 let env: Env;
@@ -296,6 +298,20 @@ describe.sequential("field API against a local D1 database", () => {
       expect(provider).toHaveBeenCalledTimes(1);
       for (const privateValue of ["farmer-a", "Ludhiana", "Punjab", id]) expect(String(provider.mock.calls[0][1]?.body)).not.toContain(privateValue);
     } finally { provider.mockRestore(); }
+  });
+  it("merges static UI progress atomically in D1 and serves a complete catalog", async () => {
+    const cacheKey = "source-safe-ui-v3:ta";
+    await env.DB.prepare("INSERT INTO translations (cache_key, copy_json, created_at) VALUES (?, ?, 0)").bind(cacheKey, JSON.stringify({ preservedAcrossWrites: "public UI cache marker" })).run();
+    const originalAi = env.AI;
+    env.AI = { run: async (_model: string, input: { text: string[] }) => ({ translations: input.text.map((text) => `தமிழ் ${text}`) }) } as unknown as Env["AI"];
+    try {
+      expect(await translateUi(env, "ta", true)).toMatchObject({ status: "pending" });
+      const cache = await env.DB.prepare("SELECT copy_json FROM translations WHERE cache_key = ?").bind(cacheKey).first<{ copy_json: string }>();
+      expect(JSON.parse(cache!.copy_json).preservedAcrossWrites).toBe("public UI cache marker");
+      const complete = await translateUi(env, "ta");
+      expect(Object.keys(complete).sort()).toEqual(Object.keys(english).sort());
+      expect(complete).toMatchObject({ dashboardWelcome: `தமிழ் ${english.dashboardWelcome}` });
+    } finally { env.AI = originalAi; }
   });
   it("deleting the profile cascades through fields, baselines and quick actions", async () => {
     await env.DB.prepare("DELETE FROM farmer_profiles WHERE subject_id = ?")

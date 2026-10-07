@@ -67,6 +67,9 @@ import { LanguageGate } from "./components/LanguageGate";
 import { StoryMode } from "./components/StoryMode";
 import { InfoPage, type InfoPageKind } from "./components/InfoPage";
 import { MobileNavigation, SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { Onboarding } from "./components/Onboarding";
+import { LanguageStatus } from "./components/LanguageStatus";
+import { validCatalog, type UiTranslationResult } from "../shared/localization";
 import type { CommunityMapPlace } from "../shared/community-map";
 const CityMap = lazy(() => import("./components/CityMap"));
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -101,8 +104,13 @@ export default function App() {
   });
   const [copy, setCopy] = useState<Copy>(english);
   const [languageBusy, setLanguageBusy] = useState(false);
+  const [languageFailed, setLanguageFailed] = useState(false);
+  const [languageProgress, setLanguageProgress] = useState(0);
+  const [languageRetry, setLanguageRetry] = useState(0);
   const [languageChosen, setLanguageChosen] = useState(() => localStorage.getItem("agroman-language-chosen") === "yes");
   const [storyMode, setStoryMode] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourDone, setTourDone] = useState(() => localStorage.getItem("agroman-onboarding-v1") === "done");
   const [error, setError] = useState("");
   const [region, setRegion] = useState<Context>();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -267,43 +275,58 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v4-1.3.0-${locale}`;
+    const localCopyKey = `agroman-ui-copy-v5-1.4.0-${locale}`;
     localStorage.setItem("agroman-locale", locale);
-    document.documentElement.lang = locale;
-    document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
-      ? "rtl"
-      : "ltr";
+    const setDocumentLanguage = (language: string) => { document.documentElement.lang = language; document.documentElement.dir = ["ur", "ks", "sd"].includes(language) ? "rtl" : "ltr"; };
     let cachedCopy: Copy | undefined;
     if (locale !== "en") {
       try {
         const cached = localStorage.getItem(localCopyKey);
         if (cached) {
           const candidate = JSON.parse(cached) as Copy;
-          if (Object.keys(english).every((key) => typeof candidate[key as keyof Copy] === "string")) cachedCopy = candidate;
+          if (validCatalog(english, candidate)) cachedCopy = candidate;
         }
       } catch {
         localStorage.removeItem(localCopyKey);
       }
     }
     setCopy(cachedCopy ?? english);
+    setDocumentLanguage(cachedCopy ? locale : "en");
+    setLanguageBusy(false); setLanguageFailed(false); setLanguageProgress(0);
     if (locale === "hi") {
       setLanguageBusy(!cachedCopy);
       void import("./lib/hi").then(({ hindi }) => {
-        if (!cancelled) { setCopy(hindi); setLanguageBusy(false); localStorage.setItem(localCopyKey, JSON.stringify(hindi)); }
-      }).catch(() => { if (!cancelled) setLanguageBusy(false); });
+        if (!cancelled) { setCopy(hindi); setDocumentLanguage("hi"); setLanguageBusy(false); localStorage.setItem(localCopyKey, JSON.stringify(hindi)); }
+      }).catch(() => { if (!cancelled) { setLanguageBusy(false); setLanguageFailed(true); } });
       return () => { cancelled = true; };
     }
     if (locale !== "en" && !demo) {
       setLanguageBusy(!cachedCopy);
-      request<Copy>("translate/ui", { locale })
+      const loadCopy = async () => {
+        for (let attempt = 0; attempt < 16; attempt++) {
+          if (cancelled) return undefined;
+          const result = await request<UiTranslationResult<Copy>>("translate/ui", { locale, incremental: true });
+          if (cancelled) return undefined;
+          if (result.status === "complete") {
+            if (!validCatalog(english, result.copy)) throw new Error("Incomplete UI catalog");
+            return result.copy;
+          }
+          if (result.status !== "pending" || !Number.isFinite(result.completed) || !Number.isFinite(result.total) || result.total <= 0) throw new Error("Invalid translation progress");
+          setLanguageProgress(Math.round(100 * result.completed / result.total));
+        }
+        throw new Error("Translation needs another attempt");
+      };
+      if (cachedCopy) return () => { cancelled = true; };
+      loadCopy()
         .then((value) => {
-          if (!cancelled) {
+          if (!cancelled && value) {
             setCopy(value);
+            setDocumentLanguage(locale);
             localStorage.setItem(localCopyKey, JSON.stringify(value));
           }
         })
-        .catch((e) => {
-          if (!cancelled) setError(e.message);
+        .catch(() => {
+          if (!cancelled) setLanguageFailed(true);
         })
         .finally(() => {
           if (!cancelled) setLanguageBusy(false);
@@ -312,7 +335,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [locale, entryMode]);
+  }, [locale, languageRetry]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [current?.messages.length, busy]);
@@ -703,22 +726,26 @@ export default function App() {
     ? (["home", "farmAdvisor", "records", "community"] as Page[]).map((item) => ({ label: item === "farmAdvisor" ? copy.farmAdvisory : t(item as keyof Copy), active: page === item, onClick: () => go(item) }))
     : (["advisor", "community"] as Page[]).map((item) => ({ label: t(item as keyof Copy), active: page === item, onClick: () => go(item) }));
   const mobileNavigation = entryMode === "farmer" ? <MobileNavigation copy={copy} items={mainItems.map((item, index) => ({ ...item, label: [copy.home, copy.navAdvisory, copy.navDiary, copy.navCommunity][index] }))} /> : undefined;
+  const tour = tourOpen ? <Onboarding copy={copy} farmer={entryMode === "farmer"} onClose={() => setTourOpen(false)} onFinish={() => { setTourOpen(false); if (entryMode === "farmer") { localStorage.setItem("agroman-onboarding-v1", "done"); setTourDone(true); go("farmAdvisor"); } }} /> : undefined;
+  const languageNotice = <LanguageStatus copy={copy} busy={languageBusy} failed={languageFailed} progress={languageProgress} machine={!demo && locale !== "en" && locale !== "hi"} onRetry={() => setLanguageRetry((value) => value + 1)} />;
   const sharedHeader = <SiteHeader copy={copy} locale={locale} onLocaleChange={setLocale} onHome={homeAction}
     items={entryMode === "visitor" ? [] : mainItems}
     primaryAction={entryMode === "visitor" ? { label: copy.googleAccess, onClick: () => void enterWithGoogle().catch((e) => setError(e.message)) } : undefined}
-    menuActions={entryMode === "visitor" ? [{ label: copy.continueGuest, onClick: () => void enterGuest().catch((e) => setError(e.message)) }] : [
+    menuActions={entryMode === "visitor" ? [{ label: copy.continueGuest, onClick: () => void enterGuest().catch((e) => setError(e.message)) }, { label: copy.quickTour, onClick: () => setTourOpen(true) }] : [
+      { label: copy.quickTour, onClick: () => setTourOpen(true) },
       ...(entryMode === "farmer" ? [{ label: copy.askAgroMan, onClick: () => go("advisor") }, { label: copy.expert, onClick: () => go("expert") }] : [{ label: copy.googleAccess, onClick: () => void enterWithGoogle().catch((e) => setError(e.message)) }]),
       { label: entryMode === "farmer" ? copy.signOut : copy.exitGuest, onClick: leaveExperience },
     ]} />;
   if (storyMode) return <StoryMode copy={copy} locale={locale} onLocaleChange={setLocale} onExit={() => { setStoryMode(false); window.history.back(); window.scrollTo(0, 0); }} />;
   const infoPages: InfoPageKind[] = ["terms", "privacyPolicy", "dataConsent", "features", "aboutProject", "aboutCreator"];
-  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} locale={locale} onLocaleChange={setLocale} kind={page as InfoPageKind} onBack={() => window.history.back()} onHome={homeAction} header={sharedHeader} navigation={mobileNavigation} error={error} onDismissError={() => setError("")} />;
+  if (infoPages.includes(page as InfoPageKind)) return <><InfoPage copy={copy} locale={locale} onLocaleChange={setLocale} kind={page as InfoPageKind} onBack={() => window.history.back()} onHome={homeAction} header={sharedHeader} navigation={mobileNavigation} error={error} onDismissError={() => setError("")} languageNotice={languageNotice} />{tour}</>;
   if (entryMode === "visitor" && !languageChosen)
     return (
       <LanguageGate
         copy={copy}
         locale={locale}
         busy={languageBusy}
+        languageNotice={languageNotice}
         onChoose={setLocale}
         onContinue={() => {
           localStorage.setItem("agroman-language-chosen", "yes");
@@ -729,7 +756,7 @@ export default function App() {
     );
   if (entryMode === "visitor")
     return (
-      <EntryGateway
+      <><EntryGateway
         copy={copy}
         error={error}
         onGuest={enterGuest}
@@ -738,8 +765,10 @@ export default function App() {
         onDismissError={() => setError("")}
         locale={locale}
         onLocaleChange={setLocale}
+        onTour={() => setTourOpen(true)}
+        languageNotice={languageNotice}
         onStory={() => { window.history.pushState({ story: true }, "", "/story"); setStoryMode(true); window.scrollTo(0, 0); }}
-      />
+      />{tour}</>
     );
   const locationSelector = activeLocation && !knownDistrict ? (
     <div className="location-select location-current"><MapPin size={17} /><span>{districtLabel}</span></div>
@@ -790,7 +819,7 @@ export default function App() {
           {t("translationPending")}
         </div>
       )}
-      {languageBusy && <div className="notice">{t("languageBusy")}</div>}
+      {languageNotice}
       {error && (
         <div className="error" role="alert">
           {error}
@@ -802,7 +831,7 @@ export default function App() {
       <main id="content">
         {page === "home" ? (
           entryMode === "farmer" ? (
-            <FarmerDashboard copy={copy} locale={locale} user={authUser} onNavigate={go} onError={setError} onLocationChange={(location) => { setActiveLocation(location); changeDistrict(locationDistrictId(location)); }} />
+            <FarmerDashboard copy={copy} locale={locale} user={authUser} onNavigate={go} onError={setError} onTour={() => setTourOpen(true)} showTour={!tourDone} onLocationChange={(location) => { setActiveLocation(location); changeDistrict(locationDistrictId(location)); }} />
           ) : <>
             <section className="hero">
               <div className="hero-content">
@@ -1313,6 +1342,7 @@ export default function App() {
       </main>
       <SiteFooter copy={copy} />
       {mobileNavigation}
+      {tour}
       {consent && (
         <div
           className="modal-backdrop"

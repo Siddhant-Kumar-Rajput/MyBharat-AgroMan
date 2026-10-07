@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { Copy } from "../lib/i18n";
 import { demo, request } from "../lib/api";
+import { InfoHint } from "./InfoHint";
 import type { FieldOutlook } from "../../shared/farm-intelligence";
 import {
   allowedPlanActions,
@@ -86,7 +87,7 @@ export function FieldPlanner({
       <h3 id="field-planning-title">
         <Sparkles size={21} aria-hidden="true" /> {t.planningTitle}
       </h3>
-      <p>{t.planningCopy}</p>
+      <InfoHint copy={t} title={t.planningTitle}><p>{t.planningCopy}</p><p>{t.planningConsent}</p></InfoHint>
       <label>
         {t.planningInputs}
         <select
@@ -112,7 +113,7 @@ export function FieldPlanner({
           disabled={busy}
           onChange={(event) => setConsent(event.target.checked)}
         />
-        <span>{t.planningConsent}</span>
+        <span>{t.planningConsentShort}</span>
       </label>
       <button
         className="primary"
@@ -139,7 +140,8 @@ export function FieldPlanner({
               {plan.cropCodes.map((crop) => t[cropCopy[crop]]).join(" · ")}
             </p>
           )}
-          <p className="field-note">{t.planningMissing}</p>
+          <p className="field-note">{t.planningLimitsShort}</p>
+          <InfoHint copy={t} title={t.planningLimitsShort}><p>{t.planningMissing}</p></InfoHint>
         </div>
       )}
     </section>

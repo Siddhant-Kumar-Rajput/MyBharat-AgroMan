@@ -4,6 +4,7 @@ import type { CropHealthCase, Phase2State } from "../../shared/domain";
 import { demo, request } from "../lib/api";
 import { loadPhase2, persistDemoPhase2 } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
+import { InfoHint } from "./InfoHint";
 
 type Props = { copy: Copy; onError: (message: string) => void };
 
@@ -13,6 +14,7 @@ export function ExpertReview({ copy: t, onError }: Props) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [denied, setDenied] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, { summary: string; monitoring: string; nonChemical: string; source: string }>>({});
 
   const priorityKey = { standard: "standardPriority", priority: "priorityPriority", urgent: "urgentPriority" } as const;
@@ -42,7 +44,8 @@ export function ExpertReview({ copy: t, onError }: Props) {
     void load
       .catch((error) => {
         setLoadFailed(true);
-        onError(error.message);
+        if (error.message === "Reviewer access required.") setDenied(true);
+        else onError(error.message);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -89,7 +92,7 @@ export function ExpertReview({ copy: t, onError }: Props) {
         <div>
           <p className="eyebrow">{t.expert}</p>
           <h1>{t.reviewerTitle}</h1>
-          <p>{t.reviewerCopy}</p>
+          <InfoHint copy={t} title={t.reviewerAccessTitle}><p>{t.reviewerCopy}</p><p>{t.reviewerAccessCopy}</p><p>{t.reviewerSetupCopy}</p></InfoHint>
         </div>
         <ShieldCheck size={42} />
       </div>
@@ -102,7 +105,7 @@ export function ExpertReview({ copy: t, onError }: Props) {
         {loading ? (
           <p>{t.loadingReview}</p>
         ) : loadFailed ? (
-          <p>{t.reviewUnavailable}</p>
+          <p role="status">{denied ? t.reviewerDenied : t.reviewUnavailable}</p>
         ) : !cases.length ? (
           <p>{t.noReviewCases}</p>
         ) : (

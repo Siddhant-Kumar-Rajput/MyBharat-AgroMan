@@ -1,5 +1,15 @@
 # Release history
 
+## v1.4.0 — 7 October 2026
+
+- Normalize visitor menu action/information typography and 44px information-link targets.
+- Wrap long-script landing headlines without clipped text, with readable non-Latin type spacing.
+- Add accessible circular information controls and inline explanation bands for dashboard/account, weather, field/photo/harvest guidance, planning and reviewer access. Keep essential warnings, results and informed per-request consent visible.
+- Add a first-use farmer tour invitation and replayable Quick tour in visitor, guest, farmer and information-page menus. Include localized steps, keyboard focus trapping/restoration, safe mobile sizing and reduced-motion-aware transitions. Tours do not write farm data.
+- Replace all-or-nothing catalog inference with short resumable translation requests, exact-source caching, atomic progress merging and in-flight deduplication. Preserve placeholders, validate complete catalogs and reuse browser caches without another provider request. Add explicit progress/retry and machine-translation disclosures.
+- Document UID-based expert approval and add a hash-only PowerShell helper; do not grant any role or change the reviewer allowlist.
+- Add translation, D1, menu typography, info-band and onboarding regression checks and diagnostic scripts that send only static public UI copy.
+
 ## v1.3.0 — 7 October 2026
 
 - Separate Overview, My Farm Advisor, My Farm Diary and Community Watch. Add a four-item, safe-area-aware mobile navigation bar, also available on information pages.

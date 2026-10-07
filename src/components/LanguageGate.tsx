@@ -2,6 +2,7 @@ import { ArrowRight, Languages } from "lucide-react";
 import { languages } from "../../shared/domain";
 import type { Copy } from "../lib/i18n";
 import { SiteFooter, SiteHeader } from "./SiteChrome";
+import type { ReactNode } from "react";
 
 type Props = {
   copy: Copy;
@@ -9,12 +10,14 @@ type Props = {
   busy: boolean;
   onChoose: (locale: string) => void;
   onContinue: () => void;
+  languageNotice?: ReactNode;
 };
 
-export function LanguageGate({ copy: t, locale, busy, onChoose, onContinue }: Props) {
+export function LanguageGate({ copy: t, locale, busy, onChoose, onContinue, languageNotice }: Props) {
   return (
     <main className="language-gate">
       <SiteHeader copy={t} locale={locale} onLocaleChange={onChoose} onHome={() => undefined} />
+      {languageNotice}
       <section className="language-gate-card" aria-labelledby="language-gate-title">
         <div className="language-gate-heading">
           <span className="language-gate-icon"><Languages /></span>

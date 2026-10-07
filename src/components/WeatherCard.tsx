@@ -3,6 +3,7 @@ import { CloudRain, Droplets, ExternalLink, Thermometer, Wind } from "lucide-rea
 import type { FarmLocation, WeatherSummary } from "../../shared/domain";
 import type { Copy } from "../lib/i18n";
 import { demo, request } from "../lib/api";
+import { InfoHint } from "./InfoHint";
 
 type Props = { copy: Copy; location?: FarmLocation; onError?: (message: string) => void };
 
@@ -37,7 +38,7 @@ export function WeatherCard({ copy: t, location, onError }: Props) {
     <article className="dashboard-card weather-card">
       <div className="weather-heading"><div><p className="card-label"><CloudRain size={16} />{t.weatherTitle}</p><h2>{weather?.location || location?.locality || location?.district || t.weatherUnavailable}</h2></div>{weather && <span>{t.weatherModelEstimate}</span>}</div>
       {busy ? <p>{t.weatherLoading}</p> : !weather ? <p>{t.weatherUnavailable}</p> : <>
-        <p className="weather-resolution">{t.weatherResolvedAs}: {weather.latitude.toFixed(2)}, {weather.longitude.toFixed(2)}</p>
+        <InfoHint copy={t} title={t.weatherTitle}><p>{t.weatherResolvedAs}: {weather.latitude.toFixed(2)}, {weather.longitude.toFixed(2)}</p><p>{t.weatherSourceNote}</p></InfoHint>
         <div className="weather-now">
           <div><Thermometer /><strong>{metric(weather.temperatureC, "°C")}</strong><span>{t.weatherTemperature}</span></div>
           <div><Droplets /><strong>{metric(weather.humidityPercent, "%")}</strong><span>{t.weatherHumidity}</span></div>
@@ -45,7 +46,7 @@ export function WeatherCard({ copy: t, location, onError }: Props) {
           <div><Wind /><strong>{metric(weather.windKph, " km/h")}</strong><span>{t.weatherWind}</span></div>
         </div>
         <div className="weather-days" aria-label={t.weatherNextDays}>{weather.daily.map((day) => <div key={day.date}><time>{new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${day.date}T12:00:00`))}</time><strong>{metric(day.maxC, "°")}</strong><span>{metric(day.rainMm, " mm")}</span></div>)}</div>
-        <small>{t.weatherSourceNote} <a href={weather.sourceUrl} target="_blank" rel="noreferrer">{weather.source}<ExternalLink size={12} /></a></small>
+        <small><a href={weather.sourceUrl} target="_blank" rel="noreferrer">{weather.source}<ExternalLink size={12} /></a></small>
       </>}
     </article>
   );
