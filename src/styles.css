@@ -2170,6 +2170,75 @@ footer > span {
   .profile-editor, .quick-actions { grid-template-columns: 1fr; gap: 24px; }
   .profile-editor form, .dashboard-actions { grid-template-columns: 1fr; }
 }
+.field-intelligence { width: 100%; max-width: 100%; margin: 28px 0; overflow-x: clip; }
+.field-title { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.field-title h2 { width: 100%; max-width: 60rem; margin: 0 0 8px; font-size: clamp(1.5rem, 4vw, 2.25rem); line-height: 1.15; }
+.field-title p, .field-panel p { line-height: 1.6; margin: 8px 0 14px; overflow-wrap: anywhere; }
+.field-title p { max-width: 65ch; }
+.field-title > button { flex-shrink: 0; }
+.field-setup { max-width: 640px; padding: 24px; border: 1px solid #cfdccd; border-radius: 20px; background: #fafcf8; }
+.field-setup h3, .field-setup > p { grid-column: 1 / -1; margin: 0; }
+.field-setup > label, .field-form-row, .field-choice { grid-column: 1 / -1; }
+.field-form-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.field-form-row label, .field-toolbar label, .field-photo-form > label { display: grid; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
+.field-intelligence input, .field-intelligence select { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.field-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.field-choice legend { font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+.field-choice button { min-height: 62px; border: 1px solid #bdceba; border-radius: 12px; padding: 12px; color: #24472d; background: white; font-weight: 600; }
+.field-choice button[aria-pressed=true] { border-color: #215d36; background: #215d36; color: white; }
+.field-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.field-toolbar label { flex: 1; max-width: 420px; }
+.field-loading { padding: 24px; border-radius: 16px; background: #f0f5ed; }
+.field-metrics { display: grid; grid-auto-flow: dense; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border-radius: 18px; overflow: hidden; background: #d2dfd0; border: 1px solid #d2dfd0; }
+.field-metrics > div { padding: 22px; background: #f7faf5; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-width: 0; }
+.field-metrics span { font-size: 13px; line-height: 1.5; color: #415342; }
+.field-metrics strong { font-size: clamp(1.2rem, 3.5vw, 2rem); font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; color: #204b2c; }
+.field-panel { margin-top: 20px; padding: 24px; border: 1px solid #d7e1d3; border-radius: 18px; background: white; }
+.field-panel h3 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
+.field-panel h3 svg { flex-shrink: 0; color: #357846; }
+.field-note { font-size: 13px; color: #536052; line-height: 1.6; overflow-wrap: anywhere; }
+.field-weather-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.field-weather-values dt { font-size: 13px; line-height: 1.5; color: #536052; }
+.field-weather-values dd { margin: 6px 0 0; color: #234e2e; font-size: 20px; font-weight: 600; }
+.field-panel small { font-size: 12px; line-height: 1.6; color: #5b675a; overflow-wrap: anywhere; }
+.field-candidates { display: grid; grid-auto-flow: dense; gap: 12px; }
+.field-candidates article { padding: 18px; border-left: 3px solid #357846; background: #f7faf5; border-radius: 0 12px 12px 0; }
+.field-candidates h4 { font-size: 19px; margin: 0 0 8px; }
+.field-candidates a { display: inline-block; color: #215d36; padding: 8px 0; font-size: 13px; text-underline-offset: 3px; }
+.field-panel > .record-form { margin-top: 20px; }
+.field-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.field-quick-actions button { min-height: 110px; padding: 18px 12px; display: flex; flex-direction: column; align-items: start; gap: 14px; border: 1px solid #bdceba; border-radius: 12px; background: #f7faf5; color: #24472d; text-align: start; }
+.field-quick-actions button:not(:disabled):hover { border-color: #215d36; background: #edf4e8; transform: translateY(-2px); }
+.field-quick-actions button span { display: grid; gap: 6px; font-weight: 600; line-height: 1.4; }
+.field-quick-actions button.done { background: #e7f2df; color: #245d2d; opacity: 1; }
+.field-photo-form { display: grid; gap: 18px; }
+.field-photo-form .field-consent { display: flex; align-items: start; gap: 12px; font-size: 13px; line-height: 1.6; font-weight: 400; }
+.field-consent input { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 3px; }
+.field-photo-result { background: #f1f6ed; padding: 18px; border-radius: 14px; margin-top: 18px; }
+.field-photo-result h4 { margin: 0; font-size: 17px; }
+.field-panel summary { font-weight: 600; cursor: pointer; min-height: 28px; }
+.field-timeline { list-style: none; margin: 16px 0 0; padding: 0; }
+.field-timeline li { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.5; padding: 14px 0; border-bottom: 1px solid #e3eadf; }
+.field-timeline li svg { flex-shrink: 0; color: #357846; }
+.field-timeline time { font-size: 12px; color: #5b675a; margin-left: auto; flex-shrink: 0; }
+.field-rule { margin: 20px 0; }
+.field-explanation { margin-top: 14px; }
+.field-explanation summary { font-size: 13px; color: #215d36; }
+.field-advanced-toggle { padding: 24px 0; border-top: 1px solid #d7e1d3; }
+.field-advanced-toggle p { font-size: 13px; color: #536052; line-height: 1.5; }
+@media (max-width: 600px) {
+  .field-title { display: grid; gap: 12px; }
+  .field-title > button { justify-self: start; }
+  .field-setup, .field-panel { padding: 18px; }
+  .field-metrics > div { padding: 18px 14px; }
+  .field-toolbar { align-items: stretch; flex-direction: column; }
+  .field-toolbar > button { align-self: start; }
+  .field-quick-actions { grid-template-columns: 1fr; }
+  .field-quick-actions button { min-height: 74px; flex-direction: row; align-items: center; padding: 16px; }
+  .field-timeline li { flex-wrap: wrap; }
+  .field-panel h3 { font-size: 18px; }
+  .field-weather-values { gap: 12px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .review-case {
     transition: none;

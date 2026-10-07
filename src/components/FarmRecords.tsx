@@ -30,6 +30,7 @@ import { demo } from "../lib/api";
 import { deletePhase2Record, loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
 import { LocationFields } from "./LocationFields";
+import { FarmIntelligence } from "./FarmIntelligence";
 
 type Props = {
   copy: Copy;
@@ -103,6 +104,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
   const [state, setState] = useState<Phase2State>(emptyState);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [recordNotice, setRecordNotice] = useState("");
   const [section, setSection] = useState<"setup" | "activity" | "inputs" | "money" | "health" | "export">("setup");
@@ -381,8 +383,6 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
       <form className="record-form" onSubmit={saveProfile}>
         <label>{t.farmerName}<input value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} /></label>
         <LocationFields copy={t} state={profile.state} district={profile.district} locality={profile.locality} pincode={profile.pincode} onChange={(location) => setProfile({ ...profile, ...location })} />
-        <label>{t.recentCrop}<select value={profile.recentCropCode} onChange={(event) => setProfile({ ...profile, recentCropCode: event.target.value })}><option value="">{t.notProvided}</option>{priorityCrops.map(([cropCode]) => <option key={cropCode} value={cropCode}>{t[cropKey[cropCode]]}</option>)}</select></label>
-        <label>{t.lastHarvestDate}<input type="date" max={today()} value={profile.lastHarvestOn} onChange={(event) => setProfile({ ...profile, lastHarvestOn: event.target.value })} /></label>
         <button className="primary" disabled={busy}>{t.saveProfile}</button>
       </form>
     </section>
@@ -391,10 +391,14 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
   return (
     <section className="records-page section">
       <div className="records-heading">
-        <div><p className="eyebrow">{t.records}</p><h1>{t.recordsTitle}</h1><p>{t.recordsCopy}</p></div>
+        <div><h1>{t.records}</h1><p>{t.recordsCopy}</p></div>
         <div className="identity-card"><ShieldCheck size={18} /><span>{state.profile.displayName || t.testIdentity}<small>{state.profile.district}, {state.profile.state}</small>{state.profile.recentCropCode && <small>{t.recentCrop}: {t[cropKey[state.profile.recentCropCode]]}</small>}{harvestIntervalDays !== undefined && <small>{harvestIntervalDays} {t.daysSinceHarvest}</small>}</span></div>
       </div>
       {demo && <div className="demo-banner"><ShieldCheck size={17} />{t.syntheticCase}</div>}
+
+      <FarmIntelligence copy={t} locale={locale} state={state} onDemoSave={commit} onRefresh={refresh} onError={onError} />
+      <div className="field-advanced-toggle"><button className="secondary" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>{advanced ? t.smartHideDetailed : t.smartDetailed}</button><p>{t.smartDetailedCopy}</p></div>
+      {advanced && <>
 
       <nav className="diary-actions" aria-label={t.diaryChooseAction}>
         <button className={section === "setup" ? "active" : ""} onClick={() => setSection("setup")}><MapPin /><span><strong>{t.diarySetup}</strong><small>{t.diarySetupCopy}</small></span></button>
@@ -520,6 +524,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
           </div>
         </article>}
       </div>
+      </>}
     </section>
   );
 }

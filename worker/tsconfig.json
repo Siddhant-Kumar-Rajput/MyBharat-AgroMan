@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src", "../shared", "../src/lib/i18n.ts"]
+  "include": ["src", "../shared", "../src/lib/i18n.ts", "../src/lib/hi.ts"]
 }

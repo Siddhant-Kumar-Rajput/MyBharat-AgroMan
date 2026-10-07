@@ -256,7 +256,7 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v2-${locale}`;
+    const localCopyKey = `agroman-ui-copy-v3-1.2.0-${locale}`;
     localStorage.setItem("agroman-locale", locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
@@ -266,12 +266,22 @@ export default function App() {
     if (locale !== "en") {
       try {
         const cached = localStorage.getItem(localCopyKey);
-        if (cached) cachedCopy = JSON.parse(cached) as Copy;
+        if (cached) {
+          const candidate = JSON.parse(cached) as Copy;
+          if (Object.keys(english).every((key) => typeof candidate[key as keyof Copy] === "string")) cachedCopy = candidate;
+        }
       } catch {
         localStorage.removeItem(localCopyKey);
       }
     }
     setCopy(cachedCopy ?? english);
+    if (locale === "hi") {
+      setLanguageBusy(!cachedCopy);
+      void import("./lib/hi").then(({ hindi }) => {
+        if (!cancelled) { setCopy(hindi); setLanguageBusy(false); localStorage.setItem(localCopyKey, JSON.stringify(hindi)); }
+      }).catch(() => { if (!cancelled) setLanguageBusy(false); });
+      return () => { cancelled = true; };
+    }
     if (locale !== "en" && !demo) {
       setLanguageBusy(!cachedCopy);
       request<Copy>("translate/ui", { locale })
@@ -762,7 +772,7 @@ export default function App() {
           {t("offline")}
         </div>
       )}
-      {locale !== "en" && demo && (
+      {locale !== "en" && locale !== "hi" && demo && (
         <div className="notice" role="status">
           {t("translationPending")}
         </div>

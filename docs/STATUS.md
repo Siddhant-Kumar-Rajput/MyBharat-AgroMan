@@ -1,5 +1,15 @@
 # Phase 2 implementation status
 
+## Current release: v1.2.0 — 7 October 2026
+
+The diary now uses a minimal field setup and a backend-computed outlook. It includes sowing/harvest transitions, daily one-tap updates, sourced planting-window screening, recent/forecast modeled rainfall, a reference water-balance signal and per-photo-consent Gemini observations. Detailed inputs, finance and exports are optional. Google sign-in permits persistence; phone verification is optional, superseding the historical gate described below.
+
+Software validation covers calculations, isolated local D1 ownership/idempotency/privacy checks and desktop/mobile farm workflows. Live deployment/smoke status is recorded in the release handoff. Actual crop-photo accuracy is not agronomically validated. Calendar coverage is intentionally limited; soil fertility and calibrated yield forecasts are not connected. See [the research, architecture and next milestones](FIELD_INTELLIGENCE_PLAN.md).
+
+Live MyBharat D1/Worker verification passed the full empty-field → sowing → duplicate-safe activity → artificial-photo rejection → harvest workflow. PIN 263139 resolved to Haldwani; five forecast days and seven recent modeled days were available. Guest persistent access returned 403. No photo bytes appeared in exported records. The check removed only its own synthetic farmer record and temporary guest account. Hindi is bundled to avoid an external-translation dependency; older incomplete browser catalogs are not reused.
+
+The notes below are historical foundation checks, not a statement that their old entry screens or phone gate remain current.
+
 MyBharat AgroMan is an isolated Phase 2 staging environment extended from the frozen Phase 1 baseline. This is not a claim of agronomic or financial production readiness.
 
 ## Live and verified

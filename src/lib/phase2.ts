@@ -10,6 +10,7 @@ import type {
 } from "../../shared/domain";
 import { demo, request } from "./api";
 import { readPhase2State, savePhase2State } from "./storage";
+import type { FieldBaseline, QuickAction, PhotoObservation } from "../../shared/farm-intelligence";
 
 type DbRow = Record<string, string | number | null>;
 
@@ -24,10 +25,16 @@ export async function loadPhase2(): Promise<Phase2State> {
       ledger: DbRow[];
       cases: DbRow[];
       outcomes: DbRow[];
+      fieldBaselines?: FieldBaseline[];
+      quickActions?: QuickAction[];
+      photoObservations?: PhotoObservation[];
     }>("records"),
   ]);
   return {
     profile: profile ?? undefined,
+    fieldBaselines: records.fieldBaselines ?? [],
+    quickActions: records.quickActions ?? [],
+    photoObservations: records.photoObservations ?? [],
     plots: records.plots.map(
       (row): FarmPlot => ({
         id: String(row.id),

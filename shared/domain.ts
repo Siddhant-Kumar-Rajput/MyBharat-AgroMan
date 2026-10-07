@@ -265,7 +265,9 @@ export type WeatherSummary = {
     rainMm: number | null;
     precipitationProbability: number | null;
     weatherCode: number | null;
+    referenceEt0Mm?: number | null;
   }>;
+  history?: WeatherSummary["daily"];
   source: string;
   sourceUrl: string;
   kind: "model_estimate";
@@ -280,7 +282,7 @@ export const plotInputSchema = z.object({
   area: z.number().positive().max(100000),
   areaUnit: z.enum(["acre", "hectare"]),
   irrigation: z.enum(["rainfed", "canal", "sprinkler", "drip", "borewell", "other"]),
-  mechanization: z.enum(["manual", "animal", "partial", "tractor"]),
+  mechanization: z.enum(["manual", "animal", "partial", "tractor", "unspecified"]),
   state: z.string().trim().min(2).max(100),
   district: z.string().trim().min(2).max(120),
   coarseCell: z.string().max(32).optional(),
@@ -470,6 +472,9 @@ export function matchCases(target: CropHealthCase, candidates: CropHealthCase[])
 }
 
 export type Phase2State = {
+  fieldBaselines?: import("./farm-intelligence").FieldBaseline[];
+  quickActions?: import("./farm-intelligence").QuickAction[];
+  photoObservations?: import("./farm-intelligence").PhotoObservation[];
   profile?: FarmerProfile;
   plots: FarmPlot[];
   cycles: CropCycle[];

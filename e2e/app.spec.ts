@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { hindi } from "../src/lib/hi";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("agroman-language-chosen", "yes"));
@@ -225,9 +226,8 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await openNavigationItem(page, "My Farm Diary");
   await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
   await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Kataka");
-  await page.getByLabel("Most recent crop (optional)").selectOption("RICE");
-  await page.getByLabel("Most recent harvest date (optional)").fill("2026-05-20");
   await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByRole("button", { name: "Open detailed records" }).click();
 
   await page.getByLabel("Plot name").fill("North field");
   await page.getByLabel("Area", { exact: true }).fill("2.5");
@@ -274,6 +274,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Approve sourced guidance" }).click();
   await expect(page.getByText("No cases are waiting for review.")).toBeVisible();
   await openNavigationItem(page, "My Farm Diary");
+  await page.getByRole("button", { name: "Open detailed records" }).click();
   await page.getByRole("button", { name: /^Records/ }).click();
 
   const download = page.waitForEvent("download");
@@ -285,6 +286,58 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Delete permanently" }).click();
   await expect(page.getByRole("heading", { name: "Create your farmer profile" })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Your farm record was deleted.");
+});
+
+test("minimal field setup computes an outlook and supports one-tap work", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
+  await openNavigationItem(page, "My Farm Diary");
+  await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Punjab");
+  await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Ludhiana");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByLabel("How much land is in this field?").fill("2");
+  await page.getByLabel("Can you water the crop when rain is not enough?").selectOption("supplemental");
+  await page.getByLabel("What did you last harvest?").selectOption("RICE");
+  await page.getByLabel("Most recent harvest date (optional)").fill("2026-01-01");
+  await page.getByLabel("How much did you harvest?").fill("18");
+  await page.getByRole("button", { name: "Save and calculate my outlook" }).click();
+  await expect(page.getByRole("heading", { name: "What the weather suggests" })).toBeVisible();
+  await expect(page.locator(".field-metrics")).toContainText("2.22");
+  await expect(page.getByLabel("Plot name")).toHaveCount(0);
+  await expect(page.getByText("No authorized, dated soil report is connected", { exact: false })).toHaveCount(1);
+  await page.getByRole("button", { name: "I have sown a crop" }).click();
+  await page.getByLabel("When did you sow this crop?").fill("2026-01-10");
+  await page.getByRole("button", { name: "Start this crop record" }).click();
+  await expect(page.getByRole("heading", { name: "What did you do today?" })).toBeVisible();
+  await page.getByRole("button", { name: /Watered the crop/ }).click();
+  await expect(page.getByRole("button", { name: /Watered the crop.*Recorded today/ })).toBeDisabled();
+  await page.getByRole("button", { name: /Removed weeds/ }).click();
+  await expect(page.getByRole("button", { name: /Removed weeds.*Recorded today/ })).toBeDisabled();
+  await page.getByText("Recent field work", { exact: true }).click();
+  await expect(page.locator(".field-timeline li")).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Watered the crop.*Recorded today/ })).toBeDisabled();
+  await page.screenshot({ path: testInfo.outputPath("field-outlook.png"), fullPage: true });
+  await page.getByRole("button", { name: "The crop is harvested" }).click();
+  await page.getByLabel("Harvest date", { exact: true }).fill("2026-09-01");
+  await page.getByLabel("How much did you harvest?").fill("20");
+  await page.getByRole("button", { name: "Save harvest and finish this crop" }).click();
+  await expect(page.getByRole("heading", { name: "Explore your next crop" })).toBeVisible();
+  await expect(page.locator(".field-metrics")).toContainText("2.47");
+  await expect(page.getByRole("heading", { name: "What did you do today?" })).toHaveCount(0);
+});
+
+test("Hindi UI loads without a translation service or stale catalog", async ({ page }) => {
+  let providerRequested = false;
+  await page.addInitScript(() => localStorage.setItem("agroman-ui-copy-v2-hi", JSON.stringify({ chatTitle: "Old incomplete catalog" })));
+  await page.route("**/v1/translate/ui", (route) => { providerRequested = true; return route.abort(); });
+  await enterAsGuest(page);
+  await page.getByLabel("Language", { exact: true }).selectOption("hi");
+  await expect(page.getByRole("heading", { name: hindi.chatTitle })).toBeVisible();
+  expect(providerRequested).toBe(false);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("Hindi read aloud loads the on-device fallback", async ({
@@ -313,7 +366,7 @@ test("Hindi read aloud loads the on-device fallback", async ({
   await enterAsGuest(page);
   await page.getByLabel("Language", { exact: true }).selectOption("hi");
   await page.getByRole("textbox").fill("मेरी फसल की देखभाल कैसे करूँ?");
-  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByRole("button", { name: hindi.send, exact: true }).click();
   await expect(
     page.getByText("Demonstration response for Ludhiana"),
   ).toBeVisible();
@@ -321,9 +374,9 @@ test("Hindi read aloud loads the on-device fallback", async ({
     (response) => response.url().endsWith("/espeak/espeak-ng.data"),
     { timeout: 45000 },
   );
-  await page.getByRole("button", { name: "Read aloud" }).click();
+  await page.getByRole("button", { name: hindi.listen }).click();
   expect((await dataRequest).ok()).toBe(true);
-  await expect(page.getByText("Preparing voice…")).toHaveCount(0, {
+  await expect(page.getByText(hindi.voiceLoading)).toHaveCount(0, {
     timeout: 45000,
   });
   await expect
