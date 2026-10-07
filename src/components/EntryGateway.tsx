@@ -27,7 +27,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      gsap.from(".entry-hero-copy > *", {
+      gsap.from(".entry-kicker, .entry-hero-copy h1, .entry-lead, .entry-actions", {
         y: 32,
         opacity: 0,
         duration: 0.9,

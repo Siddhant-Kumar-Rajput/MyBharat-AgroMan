@@ -17,9 +17,13 @@ import {
   plotInputSchema,
   positionSchema,
   profileInputSchema,
+  postalWeatherLocality,
+  selectDistrictGeocodeMatch,
   type Context,
   type CropHealthCase,
   type Diagnosis,
+  type IndianGeocodeLocation,
+  type PostalOfficeLocation,
   type Report,
 } from "../../shared/domain";
 import { english } from "../../src/lib/i18n";
@@ -73,6 +77,7 @@ const approximateLocationSchema = z.object({
   state: z.string().trim().min(2).max(100),
   district: z.string().trim().min(2).max(120),
   locality: z.string().trim().max(160).optional().default(""),
+  pincode: z.union([pincodeSchema, z.literal("")]).optional().default(""),
 });
 
 type IndicTranslationLocale =
@@ -314,6 +319,29 @@ async function body(request: Request) {
   } catch {
     throw new ApiError(400, "The request body must be valid JSON.");
   }
+}
+
+async function postalOfficesForPincode(pincode: string): Promise<PostalOfficeLocation[]> {
+  const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new ApiError(502, "PIN lookup is temporarily unavailable.");
+  const payload = await response.json() as Array<{
+    PostOffice?: Array<{
+      Name?: string;
+      Block?: string;
+      District?: string;
+      State?: string;
+      Pincode?: string;
+    }> | null;
+  }>;
+  return (payload[0]?.PostOffice ?? []).map((office) => ({
+    name: (office.Name || "").trim(),
+    block: (office.Block || "").trim(),
+    district: (office.District || "").trim(),
+    state: (office.State || "").trim(),
+    pincode: (office.Pincode || pincode).trim(),
+  })).filter((office) => office.name && office.district && office.state);
 }
 
 async function getContext(env: Env, districtId: string): Promise<Context> {
@@ -657,27 +685,13 @@ async function route(request: Request, env: Env) {
   if (request.method === "GET" && path === "locations/pincode") {
     const pincode = pincodeSchema.parse(url.searchParams.get("pincode"));
     await rateLimit(env, uid, "pincode", 60);
-    const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) throw new ApiError(502, "PIN lookup is temporarily unavailable.");
-    const payload = await response.json() as Array<{
-      Status?: string;
-      Message?: string;
-      PostOffice?: Array<{
-        Name?: string;
-        Block?: string;
-        District?: string;
-        State?: string;
-        Pincode?: string;
-      }> | null;
-    }>;
-    const locations = (payload[0]?.PostOffice ?? [])
+    const offices = await postalOfficesForPincode(pincode);
+    const locations = offices
       .map((office) => ({
-        locality: (office.Name || office.Block || "").trim(),
-        district: (office.District || "").trim(),
-        state: (office.State || "").trim(),
-        pincode: office.Pincode || pincode,
+        locality: office.name,
+        district: office.district,
+        state: office.state,
+        pincode: office.pincode,
       }))
       .filter((location) => location.locality && location.district && location.state)
       .filter((location, index, values) =>
@@ -701,22 +715,27 @@ async function route(request: Request, env: Env) {
       state: url.searchParams.get("state"),
       district: url.searchParams.get("district"),
       locality: url.searchParams.get("locality") || "",
+      pincode: url.searchParams.get("pincode") || "",
     });
     await rateLimit(env, uid, "weather", 80);
-    const place = [location.locality || location.district, location.state]
-      .filter(Boolean)
-      .join(", ");
+    let place = location.locality || location.district;
+    if (location.pincode) {
+      const offices = await postalOfficesForPincode(location.pincode);
+      const parentLocality = postalWeatherLocality(offices, location);
+      if (!parentLocality) {
+        throw new ApiError(422, "The saved PIN and locality could not be matched. Choose the postal locality again.");
+      }
+      place = parentLocality;
+    }
     const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
     geocodeUrl.searchParams.set("name", place);
-    geocodeUrl.searchParams.set("count", "1");
+    geocodeUrl.searchParams.set("count", "10");
     geocodeUrl.searchParams.set("countryCode", "IN");
     geocodeUrl.searchParams.set("language", "en");
     const geocodeResponse = await fetch(geocodeUrl, { headers: { Accept: "application/json" } });
     if (!geocodeResponse.ok) throw new ApiError(502, "Weather location lookup is temporarily unavailable.");
-    const geocode = await geocodeResponse.json() as {
-      results?: Array<{ name: string; latitude: number; longitude: number; admin1?: string; admin2?: string }>;
-    };
-    const match = geocode.results?.[0];
+    const geocode = await geocodeResponse.json() as { results?: IndianGeocodeLocation[] };
+    const match = selectDistrictGeocodeMatch(geocode.results ?? [], location);
     if (!match) throw new ApiError(404, "Weather is not available for this selected location yet.");
     const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
     forecastUrl.searchParams.set("latitude", String(match.latitude));
@@ -755,7 +774,9 @@ async function route(request: Request, env: Env) {
       source: "Open-Meteo",
       sourceUrl: "https://open-meteo.com/",
       kind: "model_estimate",
-      disclosure: "Only the selected locality, district and state were sent for approximate weather lookup.",
+      disclosure: location.pincode
+        ? "The PIN code was sent to the postal lookup provider. Its verified parent locality, district and state were used for approximate weather lookup."
+        : "Only the selected locality, district and state were sent for approximate weather lookup.",
     });
   }
 

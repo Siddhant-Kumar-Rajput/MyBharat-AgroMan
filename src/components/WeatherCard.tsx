@@ -25,18 +25,19 @@ export function WeatherCard({ copy: t, location, onError }: Props) {
     }
     let cancelled = false;
     setBusy(true);
-    const query = new URLSearchParams({ state: location.state, district: location.district, locality: location.locality || "" });
+    const query = new URLSearchParams({ state: location.state, district: location.district, locality: location.locality || "", pincode: location.pincode || "" });
     request<WeatherSummary>(`weather?${query}`)
       .then((value) => { if (!cancelled) setWeather(value); })
       .catch((error) => { if (!cancelled) onError?.(error instanceof Error ? error.message : t.error); })
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
-  }, [location?.state, location?.district, location?.locality]);
+  }, [location?.state, location?.district, location?.locality, location?.pincode]);
 
   return (
     <article className="dashboard-card weather-card">
-      <div className="weather-heading"><div><p className="card-label"><CloudRain size={16} />{t.weatherTitle}</p><h2>{location?.locality || location?.district || t.weatherUnavailable}</h2></div>{weather && <span>{t.weatherModelEstimate}</span>}</div>
+      <div className="weather-heading"><div><p className="card-label"><CloudRain size={16} />{t.weatherTitle}</p><h2>{weather?.location || location?.locality || location?.district || t.weatherUnavailable}</h2></div>{weather && <span>{t.weatherModelEstimate}</span>}</div>
       {busy ? <p>{t.weatherLoading}</p> : !weather ? <p>{t.weatherUnavailable}</p> : <>
+        <p className="weather-resolution">{t.weatherResolvedAs}: {weather.latitude.toFixed(2)}, {weather.longitude.toFixed(2)}</p>
         <div className="weather-now">
           <div><Thermometer /><strong>{metric(weather.temperatureC, "°C")}</strong><span>{t.weatherTemperature}</span></div>
           <div><Droplets /><strong>{metric(weather.humidityPercent, "%")}</strong><span>{t.weatherHumidity}</span></div>

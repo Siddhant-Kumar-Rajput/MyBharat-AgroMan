@@ -2857,6 +2857,7 @@ footer > span {
 .location-current span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .weather-card { grid-column: span 12; display: grid; gap: 22px; background: linear-gradient(135deg, #102f1e, #1d5132); color: #fff; }
+.weather-resolution { margin: -10px 0 0; color: rgba(255,255,255,.72); font-size: 13px; }
 .weather-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
 .weather-heading h2 { margin: 8px 0 0; }
 .weather-heading > span { max-width: 190px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.24); font-size: 11px; text-align: right; }

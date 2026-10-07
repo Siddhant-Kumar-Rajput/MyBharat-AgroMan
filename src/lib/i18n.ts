@@ -429,6 +429,7 @@ export const english = {
   weatherRain: "Rain",
   weatherWind: "Wind",
   weatherNextDays: "Next five days",
+  weatherResolvedAs: "Forecast coordinates",
   weatherSourceNote: "Approximate forecast from Open-Meteo. Verify severe conditions with IMD warnings before farm decisions.",
   noBoundary: "A reviewed map boundary is not available for this district yet. Nearby reports below are filtered using your saved district, with no replacement district shown.",
   approximateMapCaption: "Approximate district-centred view. The shape is not an official administrative boundary; community signals remain filtered to the saved district.",

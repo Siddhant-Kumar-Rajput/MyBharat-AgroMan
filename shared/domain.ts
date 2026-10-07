@@ -191,6 +191,63 @@ export type FarmLocation = {
   pincode: string;
 };
 
+export type PostalOfficeLocation = {
+  name: string;
+  block: string;
+  district: string;
+  state: string;
+  pincode: string;
+};
+
+function normalizedPlaceName(value: string) {
+  return value.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function postalWeatherLocality(
+  offices: PostalOfficeLocation[],
+  location: FarmLocation,
+) {
+  if (!location.pincode || !location.locality) return null;
+  const state = normalizedPlaceName(location.state);
+  const district = normalizedPlaceName(location.district);
+  const locality = normalizedPlaceName(location.locality);
+  const office = offices.find((candidate) =>
+    candidate.pincode === location.pincode &&
+    normalizedPlaceName(candidate.state) === state &&
+    normalizedPlaceName(candidate.district) === district &&
+    normalizedPlaceName(candidate.name) === locality
+  );
+  if (!office) return null;
+  const block = office.block.trim();
+  return block && !/^(na|none|null)$/i.test(block.replace(/[^a-z]/gi, ""))
+    ? block
+    : office.name;
+}
+
+export type IndianGeocodeLocation = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  admin1?: string;
+  admin2?: string;
+  admin3?: string;
+  admin4?: string;
+};
+
+export function selectDistrictGeocodeMatch(
+  candidates: IndianGeocodeLocation[],
+  location: Pick<FarmLocation, "state" | "district">,
+) {
+  const state = normalizedPlaceName(location.state);
+  const district = normalizedPlaceName(location.district);
+  return candidates.find((candidate) => {
+    const candidateDistricts = [candidate.admin2, candidate.admin3, candidate.admin4]
+      .filter((value): value is string => Boolean(value))
+      .map(normalizedPlaceName);
+    return normalizedPlaceName(candidate.admin1 || "") === state && candidateDistricts.includes(district);
+  }) ?? null;
+}
+
 export type WeatherSummary = {
   location: string;
   latitude: number;

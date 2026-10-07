@@ -166,12 +166,12 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    const query = new URLSearchParams({ state: activeLocation.state, district: activeLocation.district, locality: activeLocation.locality || "" });
+    const query = new URLSearchParams({ state: activeLocation.state, district: activeLocation.district, locality: activeLocation.locality || "", pincode: activeLocation.pincode || "" });
     request<WeatherSummary>(`weather?${query}`)
       .then((weather) => { if (!cancelled) setApproximateCenter({ lat: weather.latitude, lon: weather.longitude }); })
       .catch(() => { if (!cancelled) setApproximateCenter(undefined); });
     return () => { cancelled = true; };
-  }, [activeLocation?.state, activeLocation?.district, activeLocation?.locality, knownDistrict?.id]);
+  }, [activeLocation?.state, activeLocation?.district, activeLocation?.locality, activeLocation?.pincode, knownDistrict?.id]);
   useEffect(() => {
     const onPopState = () => {
       const next = pageFromPath();

@@ -10,6 +10,8 @@ import {
   cropCycleInputSchema,
   cycleEventInputSchema,
   profileInputSchema,
+  postalWeatherLocality,
+  selectDistrictGeocodeMatch,
   matchCases,
   summarizeLedger,
   triageCase,
@@ -34,6 +36,45 @@ function report(id: string, overrides: Partial<Report> = {}): Report {
     ...overrides,
   };
 }
+
+describe("PIN-aware weather location", () => {
+  const offices = [
+    { name: "Anandpur", block: "Haldwani", district: "Nainital", state: "Uttarakhand", pincode: "263139" },
+    { name: "Bail Parao", block: "Ramnagar", district: "Nainital", state: "Uttarakhand", pincode: "263139" },
+    { name: "Fathepur", block: "NA", district: "Nainital", state: "Uttarakhand", pincode: "263139" },
+  ];
+
+  it("uses the selected post office parent town instead of the district hill city", () => {
+    expect(postalWeatherLocality(offices, {
+      state: "Uttarakhand",
+      district: "Nainital",
+      locality: "Anandpur",
+      pincode: "263139",
+    })).toBe("Haldwani");
+    expect(postalWeatherLocality(offices, {
+      state: "Uttarakhand",
+      district: "Nainital",
+      locality: "Bail Parao",
+      pincode: "263139",
+    })).toBe("Ramnagar");
+  });
+
+  it("does not silently use a different PIN locality", () => {
+    expect(postalWeatherLocality(offices, {
+      state: "Uttarakhand",
+      district: "Nainital",
+      locality: "Nainital",
+      pincode: "263139",
+    })).toBeNull();
+  });
+
+  it("validates the geocoder result against both saved state and district", () => {
+    const correct = { name: "Haldwani", latitude: 29.22, longitude: 79.53, admin1: "Uttarakhand", admin2: "Naini Tal" };
+    const wrong = { name: "Haldwani", latitude: 30.1, longitude: 78.2, admin1: "Uttarakhand", admin2: "Dehradun" };
+    expect(selectDistrictGeocodeMatch([wrong, correct], { state: "Uttarakhand", district: "Nainital" })).toEqual(correct);
+  });
+});
+
 describe("outbreak detection", () => {
   it("requires three distinct installations", () => {
     expect(
