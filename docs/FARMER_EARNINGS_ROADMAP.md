@@ -11,6 +11,12 @@ harvest quantities and portable records. Existing crop windows and weather may
 inform field planning, but they do not predict a crop's selling price or profit.
 JSON/CSV record export is unrelated to agricultural export trade.
 
+v1.5.0 adds a server-only, authenticated national mandi sample endpoint. Its live
+validation currently fails at the upstream connection (HTTP 502); no market rows
+have been retrieved and API-key validity is not yet established. This is not a
+live nearby-market UI or a profit/export-demand integration. See
+[the validation record](DATA_GOV_MANDI_VALIDATION.md).
+
 ## What is not implemented
 
 - Live nearby mandi price ingestion, commodity/variety/grade matching and price freshness.

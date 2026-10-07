@@ -1,5 +1,12 @@
 # Release history
 
+## v1.5.0 — 8 October 2026
+
+- Add an authenticated, rate-limited, read-only mandi sample endpoint using the existing server-side `DATA_GOV_API_KEY`. Accept only a national sample size of 1–10 records; send no farmer identity, location or diary data to the provider.
+- Validate public resource metadata, normalize dated price rows, preserve missing values and expose freshness/unit limitations. Keep credentials and upstream exception text private; block redirects and never fall back to synthetic data.
+- Add isolated provider/authentication regression tests and a live diagnostic that deletes its own temporary anonymous Firebase account.
+- Deploy the backend only. Both live sample attempts returned HTTP 502 at the provider connection; no records were retrieved and key validity remains unconfirmed. Document the limitation rather than claiming a working market feed. The website UI is unchanged.
+
 ## v1.4.1 — 8 October 2026
 
 - Prioritize the open page's static language labels and display validated batches immediately; load other pages quietly in the background. Recheck priorities on navigation and menu/panel use; ignore old-language responses.

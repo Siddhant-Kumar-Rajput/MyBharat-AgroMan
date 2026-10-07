@@ -34,6 +34,7 @@ import { ApiError } from "./errors";
 import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/community-map";
 import { savedRegionReportPosition } from "./community";
 import { isUiKey, translateUi } from "./ui-translation";
+import { fetchMandiSample, mandiSampleQuery } from "./mandi";
 
 export interface Env {
   AI: Ai;
@@ -52,6 +53,7 @@ export interface Env {
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_VERIFY_SERVICE_SID?: string;
+  DATA_GOV_API_KEY?: string;
 }
 
 const authKeys = createRemoteJWKSet(
@@ -615,6 +617,17 @@ async function route(request: Request, env: Env) {
   const auth = await authenticate(request, env);
   const uid = auth.uid;
   await rateLimit(env, uid, "all", 300);
+
+  if (request.method === "GET" && path === "market/mandi/sample") {
+    const query: Record<string, string> = {};
+    url.searchParams.forEach((value, key) => {
+      if (key !== "limit" || Object.hasOwn(query, key)) throw new ApiError(400, "Only one sample limit is accepted.");
+      query[key] = value;
+    });
+    const { limit } = mandiSampleQuery.parse(query);
+    await rateLimit(env, uid, "mandi_sample", 10);
+    return json(request, env, await fetchMandiSample(env, limit));
+  }
 
   if (request.method === "GET" && path === "capabilities")
     return json(request, env, {
