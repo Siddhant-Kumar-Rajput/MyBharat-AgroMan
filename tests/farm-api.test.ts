@@ -284,6 +284,19 @@ describe.sequential("field API against a local D1 database", () => {
       call("farmer-a", "farm/action", { cycleId: next, action: "weeding" }),
     ).rejects.toMatchObject({ status: 404 });
   });
+  it("authorizes planning and consent before any provider request", async () => {
+    const provider = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ priorities: ["inspect", "soil_test"], cropCodes: [] }) }] } }] }));
+    try {
+      const input = { plotId: id, consent: true, consentVersion: "farm-planning-2026-10-07.1", locale: "en", cropProtection: "unknown" };
+      await expect(call("farmer-b", "farm/plan", input)).rejects.toMatchObject({ status: 404 });
+      await expect(call("farmer-a", "farm/plan", { ...input, consent: false })).rejects.toThrow();
+      await expect(call("farmer-a", "farm/plan", { ...input, context: { crop: "invented" } })).rejects.toThrow();
+      expect(provider).not.toHaveBeenCalled();
+      expect((await call("farmer-a", "farm/plan", input)).value).toMatchObject({ priorities: ["inspect", "soil_test"], model: "test-model" });
+      expect(provider).toHaveBeenCalledTimes(1);
+      for (const privateValue of ["farmer-a", "Ludhiana", "Punjab", id]) expect(String(provider.mock.calls[0][1]?.body)).not.toContain(privateValue);
+    } finally { provider.mockRestore(); }
+  });
   it("deleting the profile cascades through fields, baselines and quick actions", async () => {
     await env.DB.prepare("DELETE FROM farmer_profiles WHERE subject_id = ?")
       .bind("farmer-a")

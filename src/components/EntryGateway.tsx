@@ -77,7 +77,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
 
   return (
     <div className="entry" ref={root}>
-      <SiteHeader copy={t} locale={locale} onLocaleChange={onLocaleChange} onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} primaryAction={{ label: t.googleAccess, onClick: () => void run("google", onGoogle) }} menuActions={[{ label: t.continueGuest, onClick: () => void run("guest", onGuest) }]} />
+      <SiteHeader copy={t} locale={locale} onLocaleChange={onLocaleChange} onHome={() => window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })} primaryAction={{ label: t.googleAccess, disabled: Boolean(busy), onClick: () => void run("google", onGoogle) }} menuActions={[{ label: t.continueGuest, disabled: Boolean(busy), onClick: () => void run("guest", onGuest) }]} />
       {error && <div className="entry-error" role="alert"><span>{error}</span><button onClick={onDismissError}>{t.dismiss}</button></div>}
 
       <main className="entry-main">

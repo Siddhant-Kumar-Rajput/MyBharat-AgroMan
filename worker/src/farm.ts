@@ -19,6 +19,8 @@ import { english } from "../../src/lib/i18n";
 import type { Env } from "./index";
 import { ApiError } from "./errors";
 import { observeCropPhoto } from "./crop-photo";
+import { planningRequestSchema } from "../../shared/farm-planning";
+import { generateFieldPlan } from "./farm-planning";
 
 type Row = Record<string, string | number | null>;
 type WeatherLookup = (location: {
@@ -105,6 +107,16 @@ export async function handleFarm(
   path: string,
   weatherLookup: WeatherLookup,
 ): Promise<{ value: unknown; status?: number }> {
+  if (path === "farm/plan" && request.method === "POST") {
+    const input = planningRequestSchema.parse(await parse(request));
+    // Reuse the owned server-side outlook. Never accept a client-supplied farm,
+    // weather, geography or recommendation payload for provider forwarding.
+    const result = await handleFarm(new Request(`https://internal.invalid/v1/farm/outlook?plotId=${encodeURIComponent(input.plotId)}`), env, subject, "farm/outlook", weatherLookup);
+    const baseline = await env.DB.prepare("SELECT baseline_json FROM field_baselines WHERE plot_id = ? AND subject_id = ?").bind(input.plotId, subject).first<{ baseline_json: string }>();
+    const plan = await generateFieldPlan(env, input, result.value as ReturnType<typeof buildFieldOutlook>, baseline ? JSON.parse(baseline.baseline_json) : undefined);
+    // No prompt/response persistence or logs. Re-consent for each generation.
+    return { value: plan };
+  }
   if (path === "farm/setup" && request.method === "POST") {
     const input = fieldSetupSchema.parse(await parse(request));
     const profile = await env.DB.prepare(

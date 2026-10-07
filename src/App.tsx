@@ -66,14 +66,14 @@ import { FarmerDashboard } from "./components/FarmerDashboard";
 import { LanguageGate } from "./components/LanguageGate";
 import { StoryMode } from "./components/StoryMode";
 import { InfoPage, type InfoPageKind } from "./components/InfoPage";
-import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { MobileNavigation, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import type { CommunityMapPlace } from "../shared/community-map";
 const CityMap = lazy(() => import("./components/CityMap"));
 gsap.registerPlugin(ScrollTrigger, useGSAP);
-type Page = "home" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
+type Page = "home" | "farmAdvisor" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
 type EntryMode = "visitor" | "guest" | "farmer";
 const pageRoutes: Record<Page, string> = {
-  home: "/dashboard", advisor: "/advisor", records: "/diary", community: "/community",
+  home: "/dashboard", farmAdvisor: "/farm-advisor", advisor: "/advisor", records: "/diary", community: "/community",
   authority: "/community/authority", expert: "/expert-review", terms: "/terms",
   privacyPolicy: "/privacy", dataConsent: "/data-and-consent", features: "/features",
   aboutProject: "/about", aboutCreator: "/creator",
@@ -267,7 +267,7 @@ export default function App() {
   }, [districtId, entryMode]);
   useEffect(() => {
     let cancelled = false;
-    const localCopyKey = `agroman-ui-copy-v3-1.2.2-${locale}`;
+    const localCopyKey = `agroman-ui-copy-v4-1.3.0-${locale}`;
     localStorage.setItem("agroman-locale", locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = ["ur", "ks", "sd"].includes(locale)
@@ -388,6 +388,10 @@ export default function App() {
     },
     { scope: root, dependencies: [page, entryMode], revertOnUpdate: true },
   );
+  useGSAP(() => {
+    if (entryMode === "visitor" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    gsap.fromTo("#content > section, .dashboard-heading", { y: 12, opacity: .65 }, { y: 0, opacity: 1, duration: .3, clearProps: "transform,opacity" });
+  }, { scope: root, dependencies: [page, entryMode], revertOnUpdate: true });
   function go(next: Page, replace = false) {
     if (busy) return;
     setPage(next);
@@ -695,9 +699,20 @@ export default function App() {
       window.scrollTo(0, 0);
     } else go("home");
   };
+  const mainItems = entryMode === "farmer"
+    ? (["home", "farmAdvisor", "records", "community"] as Page[]).map((item) => ({ label: item === "farmAdvisor" ? copy.farmAdvisory : t(item as keyof Copy), active: page === item, onClick: () => go(item) }))
+    : (["advisor", "community"] as Page[]).map((item) => ({ label: t(item as keyof Copy), active: page === item, onClick: () => go(item) }));
+  const mobileNavigation = entryMode === "farmer" ? <MobileNavigation copy={copy} items={mainItems.map((item, index) => ({ ...item, label: [copy.home, copy.navAdvisory, copy.navDiary, copy.navCommunity][index] }))} /> : undefined;
+  const sharedHeader = <SiteHeader copy={copy} locale={locale} onLocaleChange={setLocale} onHome={homeAction}
+    items={entryMode === "visitor" ? [] : mainItems}
+    primaryAction={entryMode === "visitor" ? { label: copy.googleAccess, onClick: () => void enterWithGoogle().catch((e) => setError(e.message)) } : undefined}
+    menuActions={entryMode === "visitor" ? [{ label: copy.continueGuest, onClick: () => void enterGuest().catch((e) => setError(e.message)) }] : [
+      ...(entryMode === "farmer" ? [{ label: copy.askAgroMan, onClick: () => go("advisor") }, { label: copy.expert, onClick: () => go("expert") }] : [{ label: copy.googleAccess, onClick: () => void enterWithGoogle().catch((e) => setError(e.message)) }]),
+      { label: entryMode === "farmer" ? copy.signOut : copy.exitGuest, onClick: leaveExperience },
+    ]} />;
   if (storyMode) return <StoryMode copy={copy} locale={locale} onLocaleChange={setLocale} onExit={() => { setStoryMode(false); window.history.back(); window.scrollTo(0, 0); }} />;
   const infoPages: InfoPageKind[] = ["terms", "privacyPolicy", "dataConsent", "features", "aboutProject", "aboutCreator"];
-  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} locale={locale} onLocaleChange={setLocale} kind={page as InfoPageKind} onBack={() => window.history.back()} onHome={homeAction} />;
+  if (infoPages.includes(page as InfoPageKind)) return <InfoPage copy={copy} locale={locale} onLocaleChange={setLocale} kind={page as InfoPageKind} onBack={() => window.history.back()} onHome={homeAction} header={sharedHeader} navigation={mobileNavigation} error={error} onDismissError={() => setError("")} />;
   if (entryMode === "visitor" && !languageChosen)
     return (
       <LanguageGate
@@ -757,17 +772,7 @@ export default function App() {
       <a href="#content" className="skip">
         {t("skip")}
       </a>
-      <SiteHeader
-        copy={copy}
-        locale={locale}
-        onLocaleChange={setLocale}
-        onHome={() => go("home")}
-        items={((entryMode === "guest" ? ["advisor", "community"] : ["home", "advisor", "records", "community"]) as Page[]).map((item) => ({ label: t(item as keyof Copy), active: page === item, onClick: () => go(item) }))}
-        menuActions={[
-          ...(entryMode === "farmer" ? [{ label: t("expert"), onClick: () => go("expert") }] : []),
-          { label: entryMode === "farmer" ? t("signOut") : t("exitGuest"), onClick: leaveExperience },
-        ]}
-      />
+      {sharedHeader}
       <div className="mode-strip">
         <span className="status-dot" />
         {demo ? t("demo") : t("live")}
@@ -1203,8 +1208,8 @@ export default function App() {
               </p>
             </div>
           </section>
-        ) : page === "records" ? (
-          <FarmRecords copy={copy} locale={locale} onError={setError} />
+        ) : page === "records" || page === "farmAdvisor" ? (
+          entryMode === "farmer" ? <FarmRecords key={page} copy={copy} locale={locale} onError={setError} view={page === "farmAdvisor" ? "advisory" : "diary"} onAdvisory={() => go("farmAdvisor")} onChat={() => go("advisor")} /> : <section className="section"><h1>{copy.farmAdvisory}</h1><p>{copy.farmerAccessCopy}</p><button className="primary" onClick={() => void enterWithGoogle().catch((e) => setError(e.message))}>{copy.googleAccess}</button></section>
         ) : page === "expert" ? (
           <ExpertReview copy={copy} onError={setError} />
         ) : (
@@ -1307,6 +1312,7 @@ export default function App() {
         )}
       </main>
       <SiteFooter copy={copy} />
+      {mobileNavigation}
       {consent && (
         <div
           className="modal-backdrop"

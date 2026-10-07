@@ -31,6 +31,10 @@ async function openNavigationItem(page: Page, name: string) {
   expect(visibleIndex, `A visible navigation button named ${name}`).toBeGreaterThanOrEqual(0);
   await matching.nth(visibleIndex).click();
 }
+async function openDiarySection(page: Page, name: string) {
+  await page.getByRole("button", { name: "Diary sections", exact: true }).click();
+  await page.locator("#diary-workspace-menu").getByRole("button", { name, exact: true }).click();
+}
 
 test("landing separates limited guest access from Google farmer sign-in", async ({ page }) => {
   await page.goto("/");
@@ -227,7 +231,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Odisha");
   await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Kataka");
   await page.getByRole("button", { name: "Save profile" }).click();
-  await page.getByRole("button", { name: "Open detailed records" }).click();
+  await openDiarySection(page, "Set up farm");
 
   await page.getByLabel("Plot name").fill("North field");
   await page.getByLabel("Area", { exact: true }).fill("2.5");
@@ -235,12 +239,13 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await expect(page.getByRole("button", { name: /North field/ })).toBeVisible();
 
   await page.getByRole("button", { name: "Start cycle" }).click();
+  await openDiarySection(page, "Add activity");
   await expect(page.getByText("Active crop cycle: Rice")).toBeVisible();
   await page.getByLabel("Activity title").fill("First irrigation");
   await page.getByRole("button", { name: "Save activity" }).click();
   await expect(page.getByText("First irrigation")).toBeVisible();
 
-  await page.getByRole("button", { name: /Inputs or harvest/ }).click();
+  await openDiarySection(page, "My inputs");
   await page.getByLabel("Farmer-entered product or material name").fill("Recorded compost");
   await page.getByLabel("Recorded quantity").fill("25");
   await page.getByLabel("Farmer-entered purpose").fill("Soil preparation record");
@@ -248,20 +253,21 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await expect(page.getByText("Recorded compost")).toBeVisible();
   await expect(page.getByText(/25 Kilogram/)).toBeVisible();
 
+  await openDiarySection(page, "My harvests");
   await page.getByLabel("Recorded yield").fill("18");
   await page.getByRole("button", { name: "Save harvest record" }).click();
   await expect(page.getByText(/Recorded yield: 18 Quintal/)).toBeVisible();
 
-  await page.getByRole("button", { name: /^Money/ }).click();
+  await openDiarySection(page, "My finances");
   await page.getByLabel("Amount in rupees").fill("1250.50");
   await page.getByRole("button", { name: "Save entry" }).click();
   await expect(page.getByText("₹1,250.5")).toBeVisible();
 
-  await page.getByRole("button", { name: /^Crop health/ }).click();
+  await openDiarySection(page, "Crop health");
   await page.getByRole("button", { name: "Create labelled example case" }).click();
   await expect(page.getByText("Model score, not diagnostic certainty or probability of a cure.").first()).toBeVisible();
   await expect(page.getByText(/AGM-DEMO-/)).toBeVisible();
-  await page.getByRole("button", { name: /^Records/ }).click();
+  await openDiarySection(page, "Records");
   await expect(page.getByText("155333 · Odisha")).toBeVisible();
 
   await openNavigationItem(page, "Expert review");
@@ -274,8 +280,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
   await page.getByRole("button", { name: "Approve sourced guidance" }).click();
   await expect(page.getByText("No cases are waiting for review.")).toBeVisible();
   await openNavigationItem(page, "My Farm Diary");
-  await page.getByRole("button", { name: "Open detailed records" }).click();
-  await page.getByRole("button", { name: /^Records/ }).click();
+  await openDiarySection(page, "Records");
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download JSON" }).click();
@@ -291,7 +296,7 @@ test("farmer can build and export a phase two farm record", async ({ page }) => 
 test("minimal field setup computes an outlook and supports one-tap work", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Continue with Google", exact: true }).first().click();
-  await openNavigationItem(page, "My Farm Diary");
+  await openNavigationItem(page, "My Farm Advisor");
   await page.getByRole("combobox", { name: "State", exact: true }).selectOption("Punjab");
   await page.getByRole("combobox", { name: "District", exact: true }).selectOption("Ludhiana");
   await page.getByRole("button", { name: "Save profile" }).click();

@@ -1,5 +1,14 @@
 # Release history
 
+## v1.3.0 — 7 October 2026
+
+- Separate Overview, My Farm Advisor, My Farm Diary and Community Watch. Add a four-item, safe-area-aware mobile navigation bar, also available on information pages.
+- Give visitor and policy-page menus complete navigation, Google sign-in and guest entry. Add a visible menu label, keyboard dismissal, focus restoration and short reduced-motion-aware transitions.
+- Open the diary on a compact season summary; move activities, inputs, harvests, finances, opportunities, health, setup and export/delete controls into a secondary section menu. Keep existing records and ownership protections.
+- Add official market/FPO/export information links, explicitly not a live demand integration, partnership or profit prediction.
+- Add per-request, consent-based Gemini planning from a server-owned field outlook. Whitelist derived evidence; exclude identity, location, photos, finance and free-text records. Validate supported actions and existing crop windows; do not persist plans or silently replace live failures with synthetic output.
+- Add English/Hindi copy, updated processing disclosure and backend/mobile/desktop regression coverage.
+
 ## v1.2.2 — 7 October 2026
 
 - Fix information-page hero styles accidentally resizing the shared header. Keep common header dimensions and footer grid across routes; add readable section navigation and a compact policy notice.

@@ -8,7 +8,7 @@ import { loadPhase2, persistDemoPhase2, phase2Post } from "../lib/phase2";
 import { LocationFields } from "./LocationFields";
 import { WeatherCard } from "./WeatherCard";
 
-type DashboardPage = "advisor" | "records" | "community";
+type DashboardPage = "advisor" | "farmAdvisor" | "records" | "community";
 type Props = {
   copy: Copy;
   locale: string;
@@ -214,7 +214,8 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
         <article className="dashboard-card quick-actions">
           <div><p className="card-label">{t.quickActions}</p><h2>{t.dashboardNext}</h2></div>
           <div className="dashboard-actions">
-            <button onClick={() => onNavigate("advisor")}><MessageCircle /><span><strong>{t.advisor}</strong><small>{t.dashboardAdvisorCopy}</small></span><ArrowUpRight /></button>
+            <button onClick={() => onNavigate("farmAdvisor")}><Sprout /><span><strong>{t.farmAdvisory}</strong><small>{t.farmAdvisoryCopy}</small></span><ArrowUpRight /></button>
+            <button onClick={() => onNavigate("advisor")}><MessageCircle /><span><strong>{t.askAgroMan}</strong><small>{t.dashboardAdvisorCopy}</small></span><ArrowUpRight /></button>
             <button onClick={() => onNavigate("records")}><History /><span><strong>{t.records}</strong><small>{t.dashboardRecordsCopy}</small></span><ArrowUpRight /></button>
             <button onClick={() => onNavigate("community")}><Sprout /><span><strong>{t.community}</strong><small>{t.dashboardCommunityCopy}</small></span><ArrowUpRight /></button>
           </div>

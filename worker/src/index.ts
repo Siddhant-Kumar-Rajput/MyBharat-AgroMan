@@ -852,7 +852,7 @@ async function route(request: Request, env: Env) {
   const subject = persistentPhase2Path ? await subjectId(env, uid) : "";
 
   if (path.startsWith("farm/")) {
-    await rateLimit(env, uid, path === "farm/photo" ? "farm-photo" : "farm", path === "farm/photo" ? 12 : 100);
+    await rateLimit(env, uid, path === "farm/photo" ? "farm-photo" : path === "farm/plan" ? "farm-plan" : "farm", path === "farm/photo" || path === "farm/plan" ? 12 : 100);
     const result = await handleFarm(request, env, subject, path, fetchFieldWeather);
     return json(request, env, result.value, result.status ?? 200);
   }

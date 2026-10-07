@@ -31,6 +31,7 @@ import {
 import { demo, prepareImage, request } from "../lib/api";
 import { phase2Post } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
+import { FieldPlanner } from "./FieldPlanner";
 
 type Outlook = FieldOutlook & {
   actions: QuickAction[];
@@ -706,6 +707,7 @@ export function FarmIntelligence({
           {!loading && !outlook && <p className="field-note">{t.error}</p>}
           {outlook && (
             <>
+              <FieldPlanner key={`${outlook.plotId}-${outlook.fieldState}-${outlook.cycleId ?? "empty"}-${locale}`} copy={t} locale={locale} outlook={outlook} />
               {outlook.fieldState === "conflicting_cycles" && (
                 <p role="alert" className="field-note">
                   {t.smartConflict}

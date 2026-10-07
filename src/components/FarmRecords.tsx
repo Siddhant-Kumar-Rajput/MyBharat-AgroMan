@@ -6,6 +6,9 @@ import {
   Download,
   FileText,
   MapPin,
+  Menu,
+  ArrowUpRight,
+  X,
   PackageOpen,
   Phone,
   Plus,
@@ -36,6 +39,9 @@ type Props = {
   copy: Copy;
   locale: string;
   onError: (message: string) => void;
+  view?: "advisory" | "diary";
+  onAdvisory?: () => void;
+  onChat?: () => void;
 };
 
 const emptyState: Phase2State = { plots: [], cycles: [], events: [], ledger: [], cases: [], outcomes: [] };
@@ -100,14 +106,14 @@ function download(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function FarmRecords({ copy: t, locale, onError }: Props) {
+export function FarmRecords({ copy: t, locale, onError, view = "diary", onAdvisory, onChat }: Props) {
   const [state, setState] = useState<Phase2State>(emptyState);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [recordNotice, setRecordNotice] = useState("");
-  const [section, setSection] = useState<"setup" | "activity" | "inputs" | "money" | "health" | "export">("setup");
+  const [section, setSection] = useState<"summary" | "setup" | "activity" | "inputs" | "money" | "harvest" | "opportunities" | "health" | "export">("summary");
   const [activeCycleId, setActiveCycleId] = useState("");
   const [profile, setProfile] = useState({ displayName: "", state: "", district: "", locality: "", pincode: "", recentCropCode: "", lastHarvestOn: "" });
   const [plot, setPlot] = useState({ name: "", area: "", areaUnit: "acre", irrigation: "rainfed", mechanization: "manual" });
@@ -139,6 +145,12 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
     }));
   }, [activeCase]);
   const matches = activeCase ? matchCases(activeCase, referenceCases) : [];
+  const sections = [
+    ["summary", "diaryOverview", BookOpen], ["activity", "diaryActivity", BookOpen],
+    ["money", "myFinances", BadgeIndianRupee], ["harvest", "myHarvest", Scale],
+    ["opportunities", "myOpportunities", Sprout], ["inputs", "diaryInputs", PackageOpen],
+    ["health", "diaryHealth", ShieldCheck], ["setup", "diarySetup", MapPin], ["export", "diaryExport", FileText],
+  ] as const;
 
   async function refresh() {
     const value = await loadPhase2();
@@ -391,23 +403,28 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
   return (
     <section className="records-page section">
       <div className="records-heading">
-        <div><h1>{t.records}</h1><p>{t.recordsCopy}</p></div>
+        <div><h1>{view === "advisory" ? t.farmAdvisory : t.records}</h1><p>{view === "advisory" ? t.farmAdvisoryCopy : t.diarySimpleCopy}</p></div>
         <div className="identity-card"><ShieldCheck size={18} /><span>{state.profile.displayName || t.testIdentity}<small>{state.profile.district}, {state.profile.state}</small>{state.profile.recentCropCode && <small>{t.recentCrop}: {t[cropKey[state.profile.recentCropCode]]}</small>}{harvestIntervalDays !== undefined && <small>{harvestIntervalDays} {t.daysSinceHarvest}</small>}</span></div>
       </div>
       {demo && <div className="demo-banner"><ShieldCheck size={17} />{t.syntheticCase}</div>}
 
-      <FarmIntelligence copy={t} locale={locale} state={state} onDemoSave={commit} onRefresh={refresh} onError={onError} />
-      <div className="field-advanced-toggle"><button className="secondary" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>{advanced ? t.smartHideDetailed : t.smartDetailed}</button><p>{t.smartDetailedCopy}</p></div>
-      {advanced && <>
-
-      <nav className="diary-actions" aria-label={t.diaryChooseAction}>
-        <button className={section === "setup" ? "active" : ""} onClick={() => setSection("setup")}><MapPin /><span><strong>{t.diarySetup}</strong><small>{t.diarySetupCopy}</small></span></button>
-        <button className={section === "activity" ? "active" : ""} onClick={() => setSection("activity")}><BookOpen /><span><strong>{t.diaryActivity}</strong><small>{t.diaryActivityCopy}</small></span></button>
-        <button className={section === "inputs" ? "active" : ""} onClick={() => setSection("inputs")}><PackageOpen /><span><strong>{t.diaryInputs}</strong><small>{t.diaryInputsCopy}</small></span></button>
-        <button className={section === "money" ? "active" : ""} onClick={() => setSection("money")}><BadgeIndianRupee /><span><strong>{t.diaryMoney}</strong><small>{t.diaryMoneyCopy}</small></span></button>
-        <button className={section === "health" ? "active" : ""} onClick={() => setSection("health")}><ShieldCheck /><span><strong>{t.diaryHealth}</strong><small>{t.diaryHealthCopy}</small></span></button>
-        <button className={section === "export" ? "active" : ""} onClick={() => setSection("export")}><FileText /><span><strong>{t.diaryExport}</strong><small>{t.diaryExportCopy}</small></span></button>
-      </nav>
+      {view === "advisory" ? <><button className="text-button" onClick={onChat}>{t.askAgroMan}<ArrowUpRight size={16} /></button><FarmIntelligence copy={t} locale={locale} state={state} onDemoSave={commit} onRefresh={refresh} onError={onError} /></> : <>
+      <div className="diary-workspace-bar">
+        <strong>{t[sections.find(([key]) => key === section)![1]]}</strong>
+        <button className="secondary" aria-expanded={workspaceOpen} aria-controls="diary-workspace-menu" onClick={() => setWorkspaceOpen(!workspaceOpen)}>{workspaceOpen ? <X size={18} /> : <Menu size={18} />}{t.diarySections}</button>
+      </div>
+      {workspaceOpen && <nav id="diary-workspace-menu" className="diary-workspace-menu" aria-label={t.diaryChooseAction}>{sections.map(([key, label, Icon]) => <button key={key} className={section === key ? "active" : ""} aria-current={section === key ? "page" : undefined} onClick={() => { setSection(key); setWorkspaceOpen(false); }}><Icon size={18} /><span>{t[label]}</span></button>)}</nav>}
+      {section === "summary" && <div className="diary-overview">
+        <div className="diary-overview-actions"><button className="diary-next-action" onClick={onAdvisory}><Sprout /><span><strong>{t.diaryNextAction}</strong><small>{t.diaryNextActionCopy}</small></span><ArrowUpRight /></button><button className="secondary" onClick={() => setSection("activity")}><Plus size={17} />{t.diaryActivity}</button></div>
+        <div className="diary-at-a-glance"><div><small>{t.yourPlots}</small><strong>{state.plots.length}</strong></div><div><small>{t.activeCycle}</small><strong>{state.cycles.filter((c) => c.status === "active").length}</strong></div><div><small>{t.myHarvest}</small><strong>{state.events.filter((e) => e.type === "harvest").length}</strong></div></div>
+        <h2>{t.diaryRecent}</h2>
+        <div className="timeline">{[
+          ...state.events.map((event) => ({ id: event.id, title: event.title, date: event.occurredOn })),
+          ...(state.quickActions ?? []).map((action) => ({ id: action.id, title: t[({ irrigation: "smartWatered", weeding: "smartWeeded", crop_protection: "smartProtected" } as const)[action.action]], date: action.occurredOn })),
+        ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((event) => <div key={event.id}><span /><div><strong>{event.title}</strong><small>{event.date} · {t.selfReported}</small></div></div>)}</div>
+        {!state.events.length && !state.quickActions?.length && <p className="diary-empty">{t.diaryEmpty}</p>}
+      </div>}
+      {section === "opportunities" && <section className="opportunity-panel"><h2>{t.myOpportunities}</h2><p>{t.opportunityCopy}</p><a href="https://www.data.gov.in/catalog/current-daily-price-various-commodities-various-markets-mandi" target="_blank" rel="noreferrer"><strong>{t.opportunityMandi}</strong><span>{t.opportunityMandiCopy}</span><ArrowUpRight /></a><a href="https://farmerconnect.apeda.gov.in/Home/FCIndex" target="_blank" rel="noreferrer"><strong>{t.opportunityFpo}</strong><span>{t.opportunityFpoCopy}</span><ArrowUpRight /></a><a href="https://agriexchange.apeda.gov.in/" target="_blank" rel="noreferrer"><strong>{t.opportunityExport}</strong><span>{t.opportunityExportCopy}</span><ArrowUpRight /></a><p className="field-note">{t.opportunityLimits}</p></section>}
 
       <div className="records-grid">
         {section === "setup" && <>
@@ -465,8 +482,9 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
 
         {section === "inputs" &&
         <article className="record-panel structured-panel">
-          <div className="panel-title"><PackageOpen /><div><h2>{t.structuredRecords}</h2><p>{t.structuredRecordsCopy}</p></div></div>
+          <div className="panel-title"><PackageOpen /><div><h2>{t.diaryInputs}</h2><p>{t.farmerReportedHistory}</p></div></div>
           <div className="structured-records">
+            {section === "inputs" &&
             <form className="record-form" onSubmit={addFarmInput}>
               <div className="subform-heading"><PackageOpen /><div><strong>{t.recordFarmInput}</strong><small>{t.farmerReportedHistory}</small></div></div>
               <label>{t.inputClass}<select value={farmInput.inputClass} onChange={(event) => setFarmInput({ ...farmInput, inputClass: event.target.value })}>{Object.keys(inputClassKey).map((value) => <option key={value} value={value}>{t[inputClassKey[value]]}</option>)}</select></label>
@@ -477,7 +495,15 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
               <label>{t.eventDate}<input type="date" value={farmInput.occurredOn} onChange={(event) => setFarmInput({ ...farmInput, occurredOn: event.target.value })} required /></label>
               <label className="wide">{t.eventDetail}<textarea value={farmInput.detail} onChange={(event) => setFarmInput({ ...farmInput, detail: event.target.value })} /></label>
               <button className="secondary" disabled={busy || !activeCycle}>{t.saveFarmInput}</button>
-            </form>
+            </form>}
+          </div>
+          <div className="timeline structured-history">
+            {state.events.filter((item) => item.cycleId === activeCycle?.id && item.type === "input").map((item) => <div key={item.id}><span /><div><strong>{item.productName}</strong><small>{item.occurredOn} · {t.selfReported}</small><p>{item.amount} {t[unitKey[item.unit ?? "other"]]} · {item.purpose}</p></div></div>)}
+          </div>
+        </article>}
+        {section === "harvest" && <article className="record-panel structured-panel">
+          <div className="panel-title"><Scale /><div><h2>{t.myHarvest}</h2><p>{t.farmerReportedHistory}</p></div></div>
+          <div className="structured-records">
             <form className="record-form" onSubmit={addHarvestRecord}>
               <div className="subform-heading"><Scale /><div><strong>{t.recordHarvest}</strong><small>{t.farmerReportedHistory}</small></div></div>
               <label>{t.recordedYield}<input type="number" min="0" step="any" value={harvestRecord.yieldAmount} onChange={(event) => setHarvestRecord({ ...harvestRecord, yieldAmount: event.target.value })} required /></label>
@@ -488,7 +514,7 @@ export function FarmRecords({ copy: t, locale, onError }: Props) {
             </form>
           </div>
           <div className="timeline structured-history">
-            {state.events.filter((item) => item.cycleId === activeCycle?.id && (item.type === "input" || item.type === "harvest")).map((item) => <div key={item.id}><span /><div><strong>{item.type === "input" ? item.productName : t.harvestRecorded}</strong><small>{item.occurredOn} · {t.selfReported}</small>{item.type === "input" && item.amount !== undefined && item.unit && <p>{t.recordedQuantity}: {item.amount} {t[unitKey[item.unit]]} · {item.purpose}</p>}{item.type === "harvest" && item.yieldAmount !== undefined && item.yieldUnit && <p>{t.recordedYield}: {item.yieldAmount} {t[unitKey[item.yieldUnit]]}</p>}</div></div>)}
+            {state.events.filter((item) => item.cycleId === activeCycle?.id && item.type === "harvest").map((item) => <div key={item.id}><span /><div><strong>{t.harvestRecorded}</strong><small>{item.occurredOn} · {t.selfReported}</small>{item.yieldAmount !== undefined && item.yieldUnit && <p>{t.recordedYield}: {item.yieldAmount} {t[unitKey[item.yieldUnit]]}</p>}</div></div>)}
           </div>
         </article>}
 
