@@ -152,8 +152,7 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
       <div className="dashboard-heading">
         <div>
           <p className="eyebrow">{t.farmerDashboard}</p>
-          <h1 id="dashboard-title">{t.dashboardWelcome.replace("{name}", displayName)}</h1>
-          <InfoHint copy={t} title={t.farmerDashboard}><p>{t.dashboardCopy}</p></InfoHint>
+          <h1 id="dashboard-title"><InfoHint copy={t} title={t.farmerDashboard} label={t.dashboardWelcome.replace("{name}", displayName)}><p>{t.dashboardCopy}</p></InfoHint></h1>
         </div>
         <span className="dashboard-season"><Leaf size={18} />{t.dashboardSeason}</span>
       </div>
@@ -170,19 +169,17 @@ export function FarmerDashboard({ copy: t, locale, user, onNavigate, onError, on
             <button className="avatar-action" type="button" onClick={() => inputRef.current?.click()}><Camera size={15} />{t.changePhoto}</button>
           </div>
           <div className="profile-summary">
-            <div className="card-label"><ShieldCheck size={15} />{t.profileTitle}</div>
+            <div className="card-label"><ShieldCheck size={15} /><InfoHint copy={t} title={t.profilePhoto} label={t.profileTitle}><p>{t.sessionPhotoNotice}</p></InfoHint></div>
             <h2>{displayName}</h2>
             <p>{user?.email || t.googleAccount}</p>
             {state.profile && <p className="profile-location"><MapPin size={15} />{[state.profile.locality, state.profile.district, state.profile.state].filter(Boolean).join(", ")}</p>}
-            <InfoHint copy={t} title={t.profilePhoto}><p>{t.sessionPhotoNotice}</p></InfoHint>
           </div>
           <button className="dashboard-link" onClick={() => setEditing((value) => !value)}>{editing ? t.cancel : t.editProfile}<ArrowUpRight size={16} /></button>
         </article>
 
         <article className="dashboard-card account-card">
           <div className="card-label"><CheckCircle2 size={15} />{t.accountStatus}</div>
-          <h2>{t.googleSignedIn}</h2>
-          <InfoHint copy={t} title={t.accountStatus}><p>{t.googleRecordAccess}</p><p>{phoneStatus.verified ? t.phonePrivacy : t.phoneOptionalCopy}</p></InfoHint>
+          <h2><InfoHint copy={t} title={t.accountStatus} label={t.googleSignedIn}><p>{t.googleRecordAccess}</p><p>{phoneStatus.verified ? t.phonePrivacy : t.phoneOptionalCopy}</p></InfoHint></h2>
           <div className={phoneStatus.verified ? "account-pill linked" : "account-pill"}><Phone size={14} />{phoneStatus.verified ? t.phoneVerifiedEnding.replace("{last4}", phoneStatus.last4 || "") : t.phoneOptional}</div>
           {!phoneStatus.verified && phoneStatus.configured && (
             <div className="phone-verification">

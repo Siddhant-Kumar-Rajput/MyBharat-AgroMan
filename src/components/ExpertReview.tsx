@@ -91,8 +91,7 @@ export function ExpertReview({ copy: t, onError }: Props) {
       <div className="records-heading">
         <div>
           <p className="eyebrow">{t.expert}</p>
-          <h1>{t.reviewerTitle}</h1>
-          <InfoHint copy={t} title={t.reviewerAccessTitle}><p>{t.reviewerCopy}</p><p>{t.reviewerAccessCopy}</p><p>{t.reviewerSetupCopy}</p></InfoHint>
+          <h1><InfoHint copy={t} title={t.reviewerAccessTitle} label={t.reviewerTitle}><p>{t.reviewerCopy}</p><p>{t.reviewerAccessCopy}</p><p>{t.reviewerSetupCopy}</p></InfoHint></h1>
         </div>
         <ShieldCheck size={42} />
       </div>

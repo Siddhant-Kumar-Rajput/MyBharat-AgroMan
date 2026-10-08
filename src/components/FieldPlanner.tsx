@@ -85,9 +85,8 @@ export function FieldPlanner({
   return (
     <section className="planning-panel" aria-labelledby="field-planning-title">
       <h3 id="field-planning-title">
-        <Sparkles size={21} aria-hidden="true" /> {t.planningTitle}
+        <Sparkles size={21} aria-hidden="true" /> <InfoHint copy={t} title={t.planningTitle} label={t.planningTitle}><p>{t.planningCopy}</p><p>{t.planningConsent}</p></InfoHint>
       </h3>
-      <InfoHint copy={t} title={t.planningTitle}><p>{t.planningCopy}</p><p>{t.planningConsent}</p></InfoHint>
       <label>
         {t.planningInputs}
         <select
@@ -140,8 +139,7 @@ export function FieldPlanner({
               {plan.cropCodes.map((crop) => t[cropCopy[crop]]).join(" · ")}
             </p>
           )}
-          <p className="field-note">{t.planningLimitsShort}</p>
-          <InfoHint copy={t} title={t.planningLimitsShort}><p>{t.planningMissing}</p></InfoHint>
+          <p className="field-note"><InfoHint copy={t} title={t.planningLimitsShort} label={t.planningLimitsShort}><p>{t.planningMissing}</p></InfoHint></p>
         </div>
       )}
     </section>

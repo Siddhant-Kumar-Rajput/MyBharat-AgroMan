@@ -792,7 +792,7 @@ export function FarmIntelligence({
               <section className="field-panel">
                 <h3>
                   <CloudRain size={21} />
-                  {t.smartWeatherTitle}
+                    <InfoHint copy={t} title={t.smartWeatherTitle} label={t.smartWeatherTitle}><p>{t.smartWeatherLimit}</p></InfoHint>
                 </h3>
                 {outlook.weather ? (
                   <>
@@ -826,7 +826,6 @@ export function FarmIntelligence({
                       {demo ? t.synthetic : outlook.weather.location} ·{" "}
                       {outlook.weather.observedAt}
                     </small>
-                    <InfoHint copy={t} title={t.smartWeatherTitle}><p>{t.smartWeatherLimit}</p></InfoHint>
                   </>
                 ) : (
                   <p>{t.smartWeatherUnavailable}</p>
@@ -836,7 +835,7 @@ export function FarmIntelligence({
                 <section className="field-panel">
                   <h3>
                     <Sprout size={21} />
-                    {t.smartNextCrop}
+                    <InfoHint copy={t} title={t.smartNextCrop} label={t.smartNextCrop}><p>{t.smartCalendarLimit}</p></InfoHint>
                   </h3>
                   {outlook.calendarStatus === "not_available" ? (
                     <p>{t.smartCalendarMissing}</p>
@@ -881,7 +880,6 @@ export function FarmIntelligence({
                           </article>
                         ))}
                       </div>
-                      <InfoHint copy={t} title={t.smartNextCrop}><p>{t.smartCalendarLimit}</p></InfoHint>
                     </>
                   )}
                   <button
@@ -940,9 +938,8 @@ export function FarmIntelligence({
                   <section className="field-panel">
                     <h3>
                       <Camera size={21} />
-                      {t.smartPhotoTitle}
+                      <InfoHint copy={t} title={t.smartPhotoTitle} label={t.smartPhotoTitle}><p>{t.smartPhotoCopy}</p><p>{t.smartPhotoLimit}</p></InfoHint>
                     </h3>
-                    <InfoHint copy={t} title={t.smartPhotoTitle}><p>{t.smartPhotoCopy}</p><p>{t.smartPhotoLimit}</p></InfoHint>
                     {demo ? (
                       <p className="field-note">{t.smartDemoPhoto}</p>
                     ) : (
@@ -1018,8 +1015,7 @@ export function FarmIntelligence({
                     )}
                   </section>
                   <section className="field-panel">
-                    <h3>{t.smartHarvestTitle}</h3>
-                    <InfoHint copy={t} title={t.smartHarvestTitle}><p>{t.smartHarvestCopy}</p></InfoHint>
+                    <h3><InfoHint copy={t} title={t.smartHarvestTitle} label={t.smartHarvestTitle}><p>{t.smartHarvestCopy}</p></InfoHint></h3>
                     <button
                       className="secondary"
                       disabled={busy}

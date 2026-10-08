@@ -1,5 +1,9 @@
 # data.gov.in mandi sample: validation record
 
+Historical record: the experimental endpoint, client and diagnostic script were
+removed in v1.5.1 at the user's request. The application keeps official market
+links only. The existing Cloudflare secret is unused and was not modified.
+
 Checked on 8 October 2026. Backend-only release: v1.5.0.
 
 ## Actual result

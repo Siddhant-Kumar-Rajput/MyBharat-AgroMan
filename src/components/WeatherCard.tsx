@@ -36,9 +36,8 @@ export function WeatherCard({ copy: t, location, onError }: Props) {
 
   return (
     <article className="dashboard-card weather-card">
-      <div className="weather-heading"><div><p className="card-label"><CloudRain size={16} />{t.weatherTitle}</p><h2>{weather?.location || location?.locality || location?.district || t.weatherUnavailable}</h2></div>{weather && <span>{t.weatherModelEstimate}</span>}</div>
+      <div className="weather-heading"><div><p className="card-label"><CloudRain size={16} />{weather ? <InfoHint copy={t} title={t.weatherTitle} label={t.weatherTitle}><p>{t.weatherResolvedAs}: {weather.latitude.toFixed(2)}, {weather.longitude.toFixed(2)}</p><p>{t.weatherSourceNote}</p></InfoHint> : t.weatherTitle}</p><h2>{weather?.location || location?.locality || location?.district || t.weatherUnavailable}</h2></div>{weather && <span>{t.weatherModelEstimate}</span>}</div>
       {busy ? <p>{t.weatherLoading}</p> : !weather ? <p>{t.weatherUnavailable}</p> : <>
-        <InfoHint copy={t} title={t.weatherTitle}><p>{t.weatherResolvedAs}: {weather.latitude.toFixed(2)}, {weather.longitude.toFixed(2)}</p><p>{t.weatherSourceNote}</p></InfoHint>
         <div className="weather-now">
           <div><Thermometer /><strong>{metric(weather.temperatureC, "°C")}</strong><span>{t.weatherTemperature}</span></div>
           <div><Droplets /><strong>{metric(weather.humidityPercent, "%")}</strong><span>{t.weatherHumidity}</span></div>

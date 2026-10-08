@@ -34,7 +34,7 @@ export function LanguageStatus({
         </div>
       )}
       {machine && !busy && !failed && (
-        <InfoHint copy={t} title={t.language}>
+        <InfoHint copy={t} title={t.language} label={t.language}>
           <p>{t.languageMachineNote}</p>
           {background && <p>{t.languageBackground.replace("{percent}", String(progress))}</p>}
         </InfoHint>

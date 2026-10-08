@@ -139,7 +139,7 @@ test("first-time farmer tour covers four destinations without writing a field an
   });
 });
 
-test("information opens inline with keyboard dismissal while planning consent stays visible", async ({
+test("superscript information stays with its label and opens a bounded panel while consent stays visible", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 740 });
@@ -167,10 +167,17 @@ test("information opens inline with keyboard dismissal while planning consent st
   });
   await expect(help).toHaveAttribute("aria-expanded", "false");
   const size = await help.evaluate((node) => ({ target: node.getBoundingClientRect().width, icon: node.querySelector("svg")?.getBoundingClientRect().width, background: getComputedStyle(node).backgroundColor, border: getComputedStyle(node).borderWidth }));
-  expect(size.target).toBeGreaterThanOrEqual(44);
-  expect(size.icon).toBe(15);
+  expect(size.target).toBe(24);
+  expect(size.icon).toBe(14);
   expect(size.background).toBe("rgba(0, 0, 0, 0)");
   expect(size.border).toBe("0px");
+  expect(await help.evaluate((node) => {
+    const anchor = node.closest(".info-hint-anchor")!;
+    const range = document.createRange(); range.selectNode(anchor.firstChild!);
+    const word = range.getBoundingClientRect();
+    const icon = node.querySelector("svg")!.getBoundingClientRect();
+    return icon.left >= word.right && icon.top < word.top + word.height / 2 && icon.bottom <= word.bottom;
+  })).toBe(true);
   const button = page.getByRole("button", {
     name: "Create my next-step plan",
     exact: true,
@@ -188,10 +195,35 @@ test("information opens inline with keyboard dismissal while planning consent st
   expect(
     await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
   ).toBe(true);
+  expect(await panel.evaluate((node) => { const r = node.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
   await expect(help).toBeFocused();
+  await help.click();
+  await page.locator(".planning-consent").click();
+  await expect(panel).toHaveCount(0);
   await expect(page.locator(".planning-consent input")).toBeVisible();
   await page.locator(".planning-consent input").check();
   await expect(button).toBeEnabled();
+});
+
+test("landing motion respects reduced motion and fits narrow English and Hindi screens", async ({ page }, info) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto("/");
+  await expect(page.locator(".entry-headline-line")).toHaveCount(2);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator(".entry-sunlight")).toBeHidden();
+  for (const locale of ["en", "hi"]) {
+    await page.locator(".site-language select").selectOption(locale);
+    const bounds = await page.locator(".entry-hero h1, .entry-hero-visual, .entry-consent, .entry-story-link").evaluateAll((nodes) => nodes.map((node) => {
+      const r = node.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && node.scrollWidth <= node.clientWidth + 1;
+    }));
+    expect(bounds.every(Boolean)).toBe(true);
+    expect(await page.locator(".entry-headline-line").first().evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
+  }
+  await page.screenshot({ path: info.outputPath("landing-hindi-320.png"), fullPage: true });
+  await page.locator(".site-language select").selectOption("en");
+  await page.screenshot({ path: info.outputPath("landing-english-320.png"), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: info.outputPath("landing-desktop.png"), fullPage: true });
 });

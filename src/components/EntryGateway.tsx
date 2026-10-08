@@ -28,42 +28,32 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
 
   useGSAP(
     () => {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      gsap.from(".entry-kicker, .entry-hero-copy h1, .entry-lead, .entry-actions", {
-        y: 32,
-        opacity: 0,
-        duration: 0.9,
-        stagger: 0.1,
-        ease: "power3.out",
-      });
-      gsap.fromTo(
-        ".entry-hero-image",
-        { scale: 0.84, opacity: 0.65 },
-        {
-          scale: 1,
-          opacity: 1,
-          ease: "none",
-          scrollTrigger: { trigger: ".entry-hero", start: "top top", end: "bottom top", scrub: 1 },
-        },
-      );
-      gsap.fromTo(
-        ".entry-reveal span",
-        { opacity: 0.12 },
-        {
-          opacity: 1,
-          stagger: 0.08,
+      const media = gsap.matchMedia();
+      media.add("(prefers-reduced-motion: no-preference)", () => {
+        const entrance = gsap.timeline({ defaults: { ease: "power3.out", duration: 1.1 } });
+        entrance.from(".entry-kicker", { y: 12, opacity: .5 })
+          .from(".entry-headline-line", { yPercent: 24, opacity: .6, stagger: .14 }, .12)
+          .from(".entry-lead, .entry-hero-copy .entry-actions, .entry-story-link, .entry-consent", { y: 16, opacity: .6, stagger: .09, clearProps: "transform,opacity" }, .32)
+          .from(".entry-hero-visual", { y: 28, opacity: .65, clearProps: "transform,opacity" }, .16);
+        gsap.fromTo(".entry-sunlight", { xPercent: -65, opacity: 0 }, { xPercent: 65, opacity: .75, duration: 3.5, ease: "sine.inOut" });
+        gsap.fromTo(".entry-field-lines path", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 2.2, stagger: .16, delay: .3, ease: "power2.out" });
+        gsap.fromTo(".entry-hero-image", { backgroundPosition: "50% 48%" }, {
+          backgroundPosition: "50% 58%", ease: "none",
+          scrollTrigger: { trigger: ".entry-hero-visual", start: "top bottom", end: "bottom top", scrub: 1 },
+        });
+        gsap.fromTo(".entry-reveal span", { opacity: .55 }, {
+          opacity: 1, stagger: .08,
           scrollTrigger: { trigger: ".entry-reveal", start: "top 85%", end: "bottom 60%", scrub: 1 },
-        },
-      );
-      gsap.utils.toArray<HTMLElement>(".entry-proof-card").forEach((card, index) => {
-        gsap.from(card, {
-          y: 60 + index * 18,
-          opacity: 0,
-          scrollTrigger: { trigger: card, start: "top 92%", end: "top 68%", scrub: 0.8 },
+        });
+        gsap.utils.toArray<HTMLElement>(".entry-proof-card").forEach((card) => {
+          gsap.from(card, { y: 24, opacity: .6, duration: .65, clearProps: "transform,opacity",
+            scrollTrigger: { trigger: card, start: "top 94%", once: true },
+          });
         });
       });
+      return () => media.revert();
     },
-    { scope: root },
+    { scope: root, dependencies: [locale], revertOnUpdate: true },
   );
 
   async function run(kind: "guest" | "google", action: () => Promise<void>) {
@@ -87,7 +77,7 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
         <section className="entry-hero">
           <div className="entry-hero-copy">
             <p className="entry-kicker"><Sprout size={15} />{t.entryBrandLine}</p>
-            <h1>{t.entryHeadlineA}<br /><span>{t.entryHeadlineB}</span></h1>
+            <h1><span className="entry-headline-line">{t.entryHeadlineA}</span><span className="entry-headline-line entry-headline-accent">{t.entryHeadlineB}</span></h1>
             <p className="entry-lead">{t.entryCopy}</p>
             <div className="entry-actions">
               <button className="entry-primary" disabled={Boolean(busy)} onClick={() => void run("guest", onGuest)}>{t.continueGuest}<ArrowUpRight size={18} /></button>
@@ -97,7 +87,14 @@ export function EntryGateway({ copy: t, error, onGuest, onGoogle, onError, onDis
             <p className="entry-consent"><ShieldCheck size={15} />{t.entryConsent}</p>
           </div>
           <div className="entry-hero-visual">
-            <div className="entry-hero-image" role="img" aria-label={t.entryImageAlt} />
+            <div className="entry-hero-image" role="img" aria-label={t.entryImageAlt}>
+              <span className="entry-sunlight" aria-hidden="true" />
+              <svg className="entry-field-lines" viewBox="0 0 500 540" preserveAspectRatio="none" aria-hidden="true">
+                <path pathLength="1" d="M-30 470 Q170 250 540 340" />
+                <path pathLength="1" d="M-30 505 Q180 285 540 375" />
+                <path pathLength="1" d="M-30 540 Q190 320 540 410" />
+              </svg>
+            </div>
             <div className="entry-visual-note"><strong>{t.entryFarmerOwned}</strong><span>{t.entryFarmerOwnedCopy}</span></div>
           </div>
         </section>

@@ -1,5 +1,11 @@
 # Release history
 
+## v1.5.1 — 8 October 2026
+
+- Remove the experimental data.gov.in mandi fetch endpoint, provider adapter, diagnostic script and related tests. Keep official mandi/APEDA links; retain the historical validation record and leave the unused saved secret unchanged.
+- Attach small information icons to the last word of their labels as superscripts. Open explanations in viewport-bounded panels with outside-click and Escape dismissal, keyboard focus handling and no extra heading rows.
+- Add a staged landing entrance, finite sunlight sweep and field-line reveal, scroll reveals and button feedback. Preserve visible content, mobile layout, translations and dynamically changing reduced-motion preferences.
+
 ## v1.5.0 — 8 October 2026
 
 - Add an authenticated, rate-limited, read-only mandi sample endpoint using the existing server-side `DATA_GOV_API_KEY`. Accept only a national sample size of 1–10 records; send no farmer identity, location or diary data to the provider.
