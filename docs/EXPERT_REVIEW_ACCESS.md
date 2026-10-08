@@ -3,7 +3,8 @@
 Open the signed-in Menu → Expert review, or `/expert-review`.
 
 Google login does not make a farmer an expert. The Worker checks the SHA-256
-hash of the authenticated Firebase UID against `REVIEWER_UID_HASHES`. Ordinary
+hash of the authenticated Firebase UID against the legacy `REVIEWER_UID_HASHES`
+list and individual `REVIEWER_UID_HASH_<LABEL>` secret bindings. Ordinary
 accounts receive 403 before the case query or review write is performed.
 
 ## Add an expert identified by their Google email
@@ -18,14 +19,22 @@ accounts receive 403 before the case query or review write is performed.
    ```
 
 4. In **Cloudflare → Workers & Pages → mybharat-agroman-api → Settings → Variables
-   and Secrets**, edit the secret `REVIEWER_UID_HASHES`. Append the new lowercase
-   hash to the existing comma-separated hashes. Preserve reviewers still approved;
-   remove only a reviewer whose access the owner intends to revoke.
+   and Secrets**, add a new **Secret** with a unique name such as
+   `REVIEWER_UID_HASH_EXPERT_002`. Use uppercase letters, digits and underscores
+   in the label. Its value must be exactly the lowercase hash from the helper.
+   Choose an unused name; overwriting an existing grant replaces that expert.
+   Each individual binding holds one UID hash. Keep the legacy
+   `REVIEWER_UID_HASHES` secret unchanged: its hidden value cannot be read back
+   for a safe append. Record the label/account mapping privately, not in Git.
 5. Save/deploy the configuration. Have the expert reopen the review page while
    signed in to the same account. Do not share tokens, OTPs or passwords.
 
 The helper computes a hash locally; it does not change any secret or role.
-No reviewer privileges are granted by this UI release.
+Only the owner changes these server bindings; neither an email nor a client-side
+role flag grants access. To revoke an individual grant, delete only its binding
+and deploy. A UID also present in the legacy list remains authorized until its
+legacy grant is removed. Existing experts keep access when new grants are added.
+Firebase sign-in credentials and mobile-verification settings are unchanged.
 
 ## Current review workflow and limitations
 

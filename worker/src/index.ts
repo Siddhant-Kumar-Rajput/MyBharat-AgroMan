@@ -34,8 +34,9 @@ import { ApiError } from "./errors";
 import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/community-map";
 import { savedRegionReportPosition } from "./community";
 import { isUiKey, translateUi } from "./ui-translation";
+import { reviewerAllowed, type ReviewerBindings } from "./reviewer-access";
 
-export interface Env {
+export interface Env extends ReviewerBindings {
   AI: Ai;
   DB: D1Database;
   GEMINI_API_KEY: string;
@@ -48,7 +49,6 @@ export interface Env {
   REQUIRE_APP_CHECK: string;
   DAILY_REQUEST_LIMIT: string;
   SUBJECT_ID_KEY?: string;
-  REVIEWER_UID_HASHES?: string;
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_VERIFY_SERVICE_SID?: string;
@@ -1159,8 +1159,7 @@ async function route(request: Request, env: Env) {
   }
 
   if (path === "expert/cases" && request.method === "GET") {
-    const reviewerHashes = (env.REVIEWER_UID_HASHES || "").split(",").map((value) => value.trim()).filter(Boolean);
-    if (!reviewerHashes.includes(await sha256(uid))) throw new ApiError(403, "Reviewer access required.");
+    if (!reviewerAllowed(env, await sha256(uid))) throw new ApiError(403, "Reviewer access required.");
     const rows = await env.DB.prepare(
       `SELECT id, reference, cycle_id, crop_code, disease_code, disease_name, symptoms_json,
               confidence, confidence_band, district, coarse_cell, crop_stage, season, status,
@@ -1202,9 +1201,8 @@ async function route(request: Request, env: Env) {
 
   const reviewPath = path.match(/^expert\/cases\/([0-9a-f-]+)\/review$/);
   if (reviewPath && request.method === "POST") {
-    const reviewerHashes = (env.REVIEWER_UID_HASHES || "").split(",").map((value) => value.trim()).filter(Boolean);
     const reviewerId = await sha256(uid);
-    if (!reviewerHashes.includes(reviewerId)) throw new ApiError(403, "Reviewer access required.");
+    if (!reviewerAllowed(env, reviewerId)) throw new ApiError(403, "Reviewer access required.");
     const input = z.object({
       decision: z.enum(["approved", "changed", "undetermined"]),
       remedy: z.object({

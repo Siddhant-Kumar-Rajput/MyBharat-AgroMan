@@ -1,5 +1,11 @@
 # Release history
 
+## v1.5.2 — 8 October 2026
+
+- Support individually managed expert UID-hash secret bindings alongside the existing reviewer allowlist, so new grants do not replace unreadable legacy secrets.
+- Apply the same authorization check to queue reads and review submissions; retain Firebase token verification and anonymous-user restrictions.
+- Add authorization regression coverage for legacy/new experts, ordinary/anonymous users, independent revocation and server-derived reviewer attribution. Keep actual account identifiers and grants out of the repository.
+
 ## v1.5.1 — 8 October 2026
 
 - Remove the experimental data.gov.in mandi fetch endpoint, provider adapter, diagnostic script and related tests. Keep official mandi/APEDA links; retain the historical validation record and leave the unused saved secret unchanged.
