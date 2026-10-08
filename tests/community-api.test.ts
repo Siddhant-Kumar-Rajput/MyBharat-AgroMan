@@ -10,6 +10,8 @@ vi.mock("jose", () => ({
   jwtVerify: async (token: string) => ({ payload: { sub: token, firebase: { sign_in_provider: token === "guest" ? "anonymous" : "google.com" } } }),
 }));
 import worker, { type Env } from "../worker/src/index";
+import { COMMUNITY_REVIEW_CONSENT, signalPresentation, type CommunityCase } from "../shared/community-review";
+import type { Cluster } from "../shared/domain";
 
 let runtime: Miniflare;
 let env: Env;
@@ -36,7 +38,7 @@ beforeAll(async () => {
   await db.prepare("INSERT INTO farmer_profiles (subject_id, locale, state, district, locality, pincode, consent_version, created_at, updated_at) VALUES (?, 'en', 'Uttarakhand', 'Nainital', 'Anandpur', '263139', '2026-10-01.1', 0, 0)").bind(subject).run();
   for (const [id, uid] of [[receipt, "farmer"], [guestReceipt, "guest"]])
     await db.prepare("INSERT INTO receipts (id, uid_hash, district_id, diagnosis_json, model, expires_at, used) VALUES (?, ?, ?, ?, 'isolated-test', ?, 0)").bind(id, hash(uid), district, JSON.stringify({ crop: "RICE", diseaseCode: "TEST_CONCERN", name: "Local test concern", confidence: 0.84, evidence: ["synthetic local test"] }), Date.now() + 60000).run();
-  env = { DB: db, SUBJECT_ID_KEY: key, REQUIRE_APP_CHECK: "false", FIREBASE_PROJECT_ID: "isolated-test", ALLOWED_ORIGINS: "https://example.test" } as unknown as Env;
+  env = { DB: db, SUBJECT_ID_KEY: key, REVIEWER_UID_HASH_EXPERT_TEST: hash("expert"), REQUIRE_APP_CHECK: "false", FIREBASE_PROJECT_ID: "isolated-test", ALLOWED_ORIGINS: "https://example.test" } as unknown as Env;
   const original = globalThis.fetch;
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -48,6 +50,14 @@ beforeAll(async () => {
 afterAll(async () => { vi.unstubAllGlobals(); await runtime?.dispose(); });
 
 describe.sequential("community contribution API against isolated D1", () => {
+  it("keeps map polling out of the general advisory allowance", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const generalKey = hash(`guest_all_${day}`);
+    const before = await env.DB.prepare("SELECT count FROM quotas WHERE quota_key = ?").bind(generalKey).first();
+    expect((await request("guest", undefined, `outbreaks/nearby?districtId=${encodeURIComponent(district)}`, "GET")).status).toBe(200);
+    expect(await env.DB.prepare("SELECT count FROM quotas WHERE quota_key = ?").bind(generalKey).first()).toEqual(before);
+    expect(await env.DB.prepare("SELECT count FROM quotas WHERE quota_key = ?").bind(hash(`guest_community-feed_${day}`)).first()).toEqual({ count: 1 });
+  });
   it("rejects absent consent and another farmer's receipt", async () => {
     expect((await request("farmer", { receipt, consent: false, locationSource: "saved_region" })).status).toBe(400);
     expect((await request("other-farmer", { receipt, consent: true, locationSource: "saved_region" })).status).toBe(400);
@@ -69,5 +79,55 @@ describe.sequential("community contribution API against isolated D1", () => {
     expect(row).toEqual({ latitude_approx: 29.22, longitude_approx: 79.53 });
     expect(JSON.stringify(result)).not.toContain("263139");
     expect((await request("farmer", { receipt, consent: true, locationSource: "saved_region" })).status).toBe(409);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS total FROM community_cases").first()).toEqual({ total: 0 });
   });
+  it("routes a newly consented issue globally, publishes only expert assessments and protects concurrent reviews", async () => {
+    const expertSubject = createHmac("sha256", key).update("expert").digest("hex");
+    await env.DB.prepare("INSERT INTO farmer_profiles (subject_id, locale, state, district, locality, consent_version, created_at, updated_at) VALUES (?, 'en', 'Uttar Pradesh', 'Gautam Buddha Nagar', 'Noida', 'test', 0, 0)").bind(expertSubject).run();
+    const createReceipt = async () => {
+      const id = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO receipts (id, uid_hash, district_id, diagnosis_json, model, expires_at, used) VALUES (?, ?, ?, ?, 'test', ?, 0)").bind(id, hash("farmer"), district, JSON.stringify({ crop: "RICE", diseaseCode: "REVIEW_TEST", name: "Synthetic review concern", confidence: 0.6, evidence: ["Derived test observation"] }), Date.now() + 60000).run();
+      return id;
+    };
+    const payload = { receipt: await createReceipt(), consent: true, locationSource: "saved_region", reviewConsentVersion: COMMUNITY_REVIEW_CONSENT };
+    const response = await request("farmer", payload);
+    expect(response.status).toBe(200);
+    const result = await response.json() as { reference: string };
+    expect(result.reference).toMatch(/^COM-/);
+    const queueResponse = await request("expert", undefined, "expert/cases", "GET");
+    expect(queueResponse.status).toBe(200);
+    const queue = await queueResponse.json() as { communityCases: CommunityCase[] };
+    const item = queue.communityCases[0];
+    expect(item).toMatchObject({ reference: result.reference, districtId: district, version: 0, confidence: 0.6 });
+    expect(item.review).toBeUndefined();
+    const feed = async () => {
+      const value = await request("guest", undefined, `outbreaks/nearby?districtId=${encodeURIComponent(district)}`, "GET");
+      expect(value.status).toBe(200);
+      const body = await value.json() as { clusters: Cluster[] };
+      for (const secret of [hash("farmer"), hash("expert"), expertSubject, "263139", "Anandpur", "evidence", "reviewer_id", "installation"]) expect(JSON.stringify(body)).not.toContain(secret);
+      return body.clusters.find((cluster) => cluster.name === "Synthetic review concern")!;
+    };
+    expect(signalPresentation(await feed()).tone).toBe("pending");
+    const path = `expert/community-cases/${item.id}/review`;
+    const review = { version: 0, risk: "spreading", summary: "Isolated synthetic test assessment", prevention: ["Test prevention guidance"], sources: ["https://example.test/agronomy"], publishConsent: true };
+    for (const uid of ["guest", "farmer"]) expect((await request(uid, review, path)).status).toBe(403);
+    for (const invalid of [{ publishConsent: false }, { sources: ["javascript:alert(1)"] }, { sources: ["not a URL"] }, { sources: ["https://user:password@example.test/"] }, { prevention: [] }, { risk: "confirmed_by_ai" }]) expect((await request("expert", { ...review, ...invalid }, path)).status).toBe(400);
+    const simultaneous = await Promise.all([request("expert", review, path), request("expert", review, path)]);
+    expect(simultaneous.map((r) => r.status).sort()).toEqual([200, 409]);
+    const reviewed = await feed();
+    expect(signalPresentation(reviewed).tone).toBe("hazard");
+    expect(reviewed.reviews?.[0]).toMatchObject({ risk: "spreading", summary: review.summary, prevention: review.prevention, sources: review.sources });
+    expect(reviewed.awaitingReview).toBe(false);
+    expect((await request("farmer", payload)).status).toBe(409);
+    expect((await request("farmer", { ...payload, receipt: await createReceipt() })).status).toBe(200);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS total FROM community_cases").first()).toEqual({ total: 1 });
+    expect(await env.DB.prepare("SELECT version FROM community_cases WHERE id = ?").bind(item.id).first()).toEqual({ version: 1 });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS total FROM community_reviews").first()).toEqual({ total: 1 });
+    expect((await request("expert", { ...review, version: 1, risk: "resolved" }, path)).status).toBe(200);
+    expect(signalPresentation(await feed()).label).toBe("communityResolved");
+    expect((await request("expert", review, path)).status).toBe(409);
+    await env.DB.prepare("UPDATE reports SET expires_at = 0 WHERE disease_code = 'REVIEW_TEST'").run();
+    expect(await feed()).toBeUndefined();
+    expect((await request("expert", { ...review, version: 2 }, path)).status).toBe(404);
+  }, 30000);
 });

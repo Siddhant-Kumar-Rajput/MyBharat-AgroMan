@@ -38,6 +38,44 @@ Firebase sign-in credentials and mobile-verification settings are unchanged.
 
 ## Current review workflow and limitations
 
+### Community issues (v1.6.0)
+
+1. A farmer or guest obtains a server-authorized photo observation in the crop
+   advisory chat and selects **Share an issue for expert review**. The separate
+   consent explains the derived fields sent to reviewers and the public result.
+2. The issue appears on its district's Community Watch as **Potential risk ·
+   awaiting expert review**, at an approximate location. Any viewer of that
+   district can see it. A profile's city controls the initial map, not reviewer access.
+3. An owner-authorized expert opens **Expert review → Community issues · all
+   regions**. The queue is global, capped at 100 recent active issues with pending
+   reviews first. A Haldwani expert can review a Noida report and vice versa.
+4. The expert selects monitoring, risk of spread, risk not confirmed, or resolved;
+   writes a public summary and prevention steps; adds an HTTPS source; and confirms
+   publication. Only **risk of spread** turns the marker red. Report counts and
+   model confidence never do. Changing the assessment updates its marker.
+5. Community Watch shows the assessment, advice, sources and review date in the
+   marker and issue card. Live maps refresh every 30 seconds while visible, on
+   return/focus, and with **Refresh issues**. Errors clear stale signals. Read-only
+   feed requests have a separate 3,000/day allowance so automatic refresh does
+   not consume the general advisory allowance; general access remains 300/day.
+
+Public responses omit identity, reviewer-account identifiers, PIN/locality and
+photos. Reviews are attributed internally to the server-authenticated reviewer,
+stored immutably, and protected from stale overwrites by a case version. Experts
+must not put private information into public free text. Sources are required but
+not automatically verified for agronomic correctness or government endorsement.
+
+Migration `0008_community_review.sql` is additive and does not backfill old reports.
+Old contributions stay **Unreviewed observation** until their owner submits a new
+authorized observation with the new review consent. Same-day duplicate reports
+do not erase an existing assessment. The public window is seven days from the
+latest observation/review; report expiry is 90 days from contribution. Expiry
+excludes records from the active feed/queue, not a claim of automatic physical
+deletion. There is no promised expert response time, push notification, or
+external expert-service integration. The visible-growth checker remains separate.
+
+### Private crop-cycle cases
+
 - The server queue contains persisted cases marked `pending_review` or
   `follow_up_due`, with urgent triage first. The queue is not an external live
   expert-service integration and does not promise availability or response time.
@@ -48,6 +86,6 @@ Firebase sign-in credentials and mobile-verification settings are unchanged.
 - AI triage orders cases; it is not human approval or diagnostic certainty.
 - The synthetic Crop health example in the demo diary is a presentation fixture.
   The visible-growth photo checker is a separate tool: checking a photo does
-  not automatically create an expert case. Farmer-facing review delivery and
-  the complete live escalation UI remain unfinished; do not present them as
-  completed merely because the reviewer endpoints exist.
+  not automatically create an expert case. Private case guidance does not
+  automatically publish to Community Watch; public sharing requires the
+  separate community contribution and consent described above.

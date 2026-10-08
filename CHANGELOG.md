@@ -1,5 +1,12 @@
 # Release history
 
+## v1.6.0 — 8 October 2026
+
+- Connect newly consented community issues to a global expert queue, separate from private crop-cycle cases. Preserve older contributions as unreviewed observations; do not infer new consent or backfill expert tickets.
+- Publish an authorized expert's sourced assessment and prevention advice on aggregate map signals. Pending issues remain amber; only an explicit expert spread-risk assessment is red. Support monitoring, risk-not-confirmed and resolved states without using model confidence or report count as diagnostic confirmation.
+- Add immutable review history, version-based conflict protection, deduplicated receipt handling, expiry filtering and public-field-only responses. Preserve existing individual and legacy reviewer grants.
+- Add compact English/Hindi review forms, expandable advice, visible-page map refresh and stale-feed error handling. Cover isolated D1 authorization, cross-region queues, concurrent review writes, privacy and desktop/mobile map updates.
+
 ## v1.5.2 — 8 October 2026
 
 - Support individually managed expert UID-hash secret bindings alongside the existing reviewer allowlist, so new grants do not replace unreadable legacy secrets.

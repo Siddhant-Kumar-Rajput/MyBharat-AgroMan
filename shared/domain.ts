@@ -128,6 +128,8 @@ export const adviceSchema = z.object({
 });
 export type AdviceRequest = z.infer<typeof adviceSchema>;
 export type Report = {
+  awaitingReview?: boolean;
+  review?: import("./community-review").PublicCommunityReview;
   id: string;
   installation: string;
   districtId: string;
@@ -141,6 +143,8 @@ export type Report = {
   origin: "demo" | "live";
 };
 export type Cluster = {
+  awaitingReview?: boolean;
+  reviews?: import("./community-review").PublicCommunityReview[];
   id: string;
   districtId: string;
   name: string;
@@ -502,7 +506,7 @@ export function clusterReports(reports: Report[], now = Date.now()): Cluster[] {
   const accepted = reports
     .filter(
       (r) =>
-        r.confidence >= 0.75 &&
+        (r.awaitingReview || r.review || r.confidence >= 0.75) &&
         r.timestamp <= now &&
         r.timestamp >= now - 7 * 86400000,
     )
@@ -515,6 +519,8 @@ export function clusterReports(reports: Report[], now = Date.now()): Cluster[] {
         g[0].origin === r.origin &&
         g[0].crop === r.crop &&
         g[0].diseaseCode === r.diseaseCode &&
+        Boolean(g[0].awaitingReview) === Boolean(r.awaitingReview) &&
+        g[0].review?.risk === r.review?.risk &&
         g.every((other) => distanceKm(r, other) <= 10),
     );
     if (group) group.push(r);
@@ -531,6 +537,8 @@ export function clusterReports(reports: Report[], now = Date.now()): Cluster[] {
       lon: g.reduce((sum, report) => sum + report.lon, 0) / g.length,
       status: count >= 3 ? "potential" : count === 2 ? "watch" : "observation",
       origin: g[0].origin,
+      awaitingReview: Boolean(g[0].awaitingReview),
+      reviews: [...new Map(g.filter((r) => r.review).map((r) => [JSON.stringify(r.review), r.review!])).values()].sort((a, b) => b.reviewedAt - a.reviewedAt).slice(0, 5),
     };
   });
 }

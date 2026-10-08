@@ -5,10 +5,15 @@ import { demo, request } from "../lib/api";
 import { loadPhase2, persistDemoPhase2 } from "../lib/phase2";
 import type { Copy } from "../lib/i18n";
 import { InfoHint } from "./InfoHint";
+import { CommunityExpertCases } from "./CommunityExpertCases";
+import type { CommunityCase, CommunityReviewInput, PublicCommunityReview } from "../../shared/community-review";
+import type { Report } from "../../shared/domain";
 
-type Props = { copy: Copy; onError: (message: string) => void };
+type Props = { copy: Copy; onError: (message: string) => void; demoReports?: Report[]; onDemoReview?: (id: string, review: PublicCommunityReview) => void };
 
-export function ExpertReview({ copy: t, onError }: Props) {
+export function ExpertReview({ copy: t, onError, demoReports = [], onDemoReview }: Props) {
+  const [communityCases, setCommunityCases] = useState<CommunityCase[]>([]);
+  const [refresh, setRefresh] = useState(0);
   const [state, setState] = useState<Phase2State>();
   const [cases, setCases] = useState<CropHealthCase[]>([]);
   const [busy, setBusy] = useState(false);
@@ -33,22 +38,43 @@ export function ExpertReview({ copy: t, onError }: Props) {
   } as const;
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setLoadFailed(false); setDenied(false);
     const load = demo
       ? loadPhase2().then((value) => {
+          if (cancelled) return;
           setState(value);
           setCases(value.cases.filter((item) => item.status === "pending_review"));
         })
-      : request<{ cases: CropHealthCase[] }>("expert/cases").then((value) =>
-          setCases(value.cases),
-        );
+      : request<{ cases: CropHealthCase[]; communityCases: CommunityCase[] }>("expert/cases").then((value) => {
+          if (cancelled) return;
+          setCases(value.cases);
+          setCommunityCases(value.communityCases);
+        });
     void load
       .catch((error) => {
+        if (cancelled) return;
         setLoadFailed(true);
         if (error.message === "Reviewer access required.") setDenied(true);
         else onError(error.message);
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [refresh]);
+
+  const demoCases: CommunityCase[] = demoReports.filter((report) => report.awaitingReview || report.review).map((report) => ({
+    id: report.id, reference: `DEMO-${report.id.slice(0, 8)}`, districtId: report.districtId, crop: report.crop,
+    diseaseName: report.name, confidence: report.confidence, evidence: [t.syntheticCase], createdAt: report.timestamp,
+    version: 0, priority: "standard", review: report.review,
+  }));
+  async function publishCommunity(item: CommunityCase, input: CommunityReviewInput) {
+    if (demo) {
+      onDemoReview?.(item.id, { risk: input.risk, summary: input.summary, prevention: input.prevention, sources: input.sources, reviewedAt: Date.now() });
+      return;
+    }
+    const result = await request<{ version: number; review: PublicCommunityReview }>(`expert/community-cases/${item.id}/review`, input);
+    setCommunityCases((current) => current.map((entry) => entry.id === item.id ? { ...entry, ...result } : entry));
+  }
 
   async function approve(item: CropHealthCase) {
     const draft = drafts[item.id];
@@ -101,13 +127,13 @@ export function ExpertReview({ copy: t, onError }: Props) {
         </div>
       )}
       <div className="review-queue">
+        <button className="secondary" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>{t.communityRefresh}</button>
+        {!loading && !loadFailed && <CommunityExpertCases cases={demo ? demoCases : communityCases} copy={t} onPublish={publishCommunity} />}
         {loading ? (
           <p>{t.loadingReview}</p>
         ) : loadFailed ? (
           <p role="status">{denied ? t.reviewerDenied : t.reviewUnavailable}</p>
-        ) : !cases.length ? (
-          <p>{t.noReviewCases}</p>
-        ) : (
+        ) : !cases.length ? null : (
           cases.map((item) => (
             <article className="record-panel review-case" key={item.id}>
               <div className="review-case-heading"><span className="case-status">{t.pendingReview}</span>{item.aiTriage && <span className={`triage-priority ${item.aiTriage.priority}`}>{t[priorityKey[item.aiTriage.priority]]}</span>}</div>

@@ -35,6 +35,8 @@ import { resolveCommunityMapPlace, type CommunityMapPlace } from "../../shared/c
 import { savedRegionReportPosition } from "./community";
 import { isUiKey, translateUi } from "./ui-translation";
 import { reviewerAllowed, type ReviewerBindings } from "./reviewer-access";
+import { COMMUNITY_REVIEW_CONSENT } from "../../shared/community-review";
+import { communityQueue, communityReports, reviewCommunityCase } from "./community-review";
 
 export interface Env extends ReviewerBindings {
   AI: Ai;
@@ -614,7 +616,9 @@ async function route(request: Request, env: Env) {
 
   const auth = await authenticate(request, env);
   const uid = auth.uid;
-  await rateLimit(env, uid, "all", 300);
+  const communityFeedRead = request.method === "GET" && (path === "outbreaks/nearby" || path === "authority/outbreaks");
+  // Automatic map refreshes have their own bounded read budget; they must not exhaust advisory access.
+  await rateLimit(env, uid, communityFeedRead ? "community-feed" : "all", communityFeedRead ? 3000 : 300);
 
   if (request.method === "GET" && path === "capabilities")
     return json(request, env, {
@@ -1158,6 +1162,13 @@ async function route(request: Request, env: Env) {
     return json(request, env, { ok: true, escalate: input.result === "worse" });
   }
 
+  const communityReviewPath = path.match(/^expert\/community-cases\/([0-9a-f-]{36})\/review$/);
+  if (communityReviewPath && request.method === "POST") {
+    const reviewer = await sha256(uid);
+    if (!reviewerAllowed(env, reviewer)) throw new ApiError(403, "Reviewer access required.");
+    return json(request, env, await reviewCommunityCase(env.DB, communityReviewPath[1], reviewer, await body(request)));
+  }
+
   if (path === "expert/cases" && request.method === "GET") {
     if (!reviewerAllowed(env, await sha256(uid))) throw new ApiError(403, "Reviewer access required.");
     const rows = await env.DB.prepare(
@@ -1169,7 +1180,7 @@ async function route(request: Request, env: Env) {
        ORDER BY CASE triage_priority WHEN 'urgent' THEN 0 WHEN 'priority' THEN 1 ELSE 2 END,
                 created_at ASC LIMIT 100`,
     ).all<Record<string, string | number | null>>();
-    return json(request, env, { cases: rows.results.map((row) => ({
+    return json(request, env, { communityCases: await communityQueue(env.DB), cases: rows.results.map((row) => ({
       id: row.id,
       reference: row.reference,
       cycleId: row.cycle_id,
@@ -1321,6 +1332,7 @@ async function route(request: Request, env: Env) {
       .object({
         receipt: z.string().uuid(),
         consent: z.literal(true),
+        reviewConsentVersion: z.literal(COMMUNITY_REVIEW_CONSENT).optional(),
         position: positionSchema.optional(),
         locationSource: z.enum(["gps", "saved_region"]).default("gps"),
       })
@@ -1369,15 +1381,15 @@ async function route(request: Request, env: Env) {
     const reportId = await sha256(
       `${installation}_${districtId}_${diagnosis.crop}_${diagnosis.diseaseCode}_${day}`,
     );
-    await env.DB.batch([
+    const communityCaseId = crypto.randomUUID();
+    const reference = `COM-${communityCaseId.toUpperCase()}`;
+    const now = Date.now();
+    const writes: D1PreparedStatement[] = [
       env.DB.prepare(
-        "UPDATE receipts SET used = 1 WHERE id = ? AND used = 0",
-      ).bind(input.receipt),
-      env.DB.prepare(
-        `INSERT OR REPLACE INTO reports
+        `INSERT OR IGNORE INTO reports
          (id, installation, district_id, crop, disease_code, name, confidence,
           latitude_approx, longitude_approx, timestamp, origin, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live', ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live', ? FROM receipts WHERE id = ? AND used = 0`,
       ).bind(
         reportId,
         installation,
@@ -1388,11 +1400,20 @@ async function route(request: Request, env: Env) {
         diagnosis.confidence,
         Math.round(reportPosition.lat * 100) / 100,
         Math.round(reportPosition.lon * 100) / 100,
-        Date.now(),
-        Date.now() + 90 * 86400000,
+        now,
+        now + 90 * 86400000,
+        input.receipt,
       ),
-    ]);
-    return json(request, env, { ok: true });
+    ];
+    if (input.reviewConsentVersion) writes.push(env.DB.prepare(`INSERT OR IGNORE INTO community_cases
+      (id, report_id, reference, evidence_json, consent_version, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ? FROM receipts WHERE id = ? AND used = 0`).bind(
+        communityCaseId, reportId, reference, JSON.stringify(diagnosis.evidence), COMMUNITY_REVIEW_CONSENT, now, now, input.receipt));
+    writes.push(env.DB.prepare("UPDATE receipts SET used = 1 WHERE id = ? AND used = 0").bind(input.receipt));
+    const changes = await env.DB.batch(writes);
+    if (!changes.at(-1)?.meta.changes) throw new ApiError(409, "Observation already contributed.");
+    const created = input.reviewConsentVersion ? await env.DB.prepare("SELECT reference FROM community_cases WHERE report_id = ?").bind(reportId).first<{ reference: string }>() : null;
+    return json(request, env, { ok: true, reference: created?.reference });
   }
   if (request.method === "GET" && path === "districts/boundary") {
     const districtId = districtSchema.parse(url.searchParams.get("districtId"));
@@ -1416,42 +1437,10 @@ async function route(request: Request, env: Env) {
     (path === "outbreaks/nearby" || path === "authority/outbreaks")
   ) {
     const districtId = districtSchema.parse(url.searchParams.get("districtId"));
-    const rows = await env.DB.prepare(
-      `SELECT id, installation, district_id, crop, disease_code, name, confidence,
-              latitude_approx, longitude_approx, timestamp, origin
-       FROM reports WHERE district_id = ? AND timestamp >= ?
-       ORDER BY timestamp DESC LIMIT 1000`,
-    )
-      .bind(districtId, Date.now() - 7 * 86400000)
-      .all<{
-        id: string;
-        installation: string;
-        district_id: string;
-        crop: string;
-        disease_code: string;
-        name: string;
-        confidence: number;
-        latitude_approx: number;
-        longitude_approx: number;
-        timestamp: number;
-        origin: "live";
-      }>();
-    const reports: Report[] = rows.results.map((row) => ({
-      id: row.id,
-      installation: row.installation,
-      districtId: row.district_id,
-      crop: row.crop,
-      diseaseCode: row.disease_code,
-      name: row.name,
-      confidence: row.confidence,
-      lat: row.latitude_approx,
-      lon: row.longitude_approx,
-      timestamp: row.timestamp,
-      origin: row.origin,
-    }));
+    const { reports, truncated } = await communityReports(env.DB, districtId);
     return json(request, env, {
       clusters: clusterReports(reports),
-      truncated: rows.results.length === 1000,
+      truncated,
     });
   }
   if (request.method === "POST" && path === "translate/ui") {

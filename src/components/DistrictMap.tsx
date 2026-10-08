@@ -1,4 +1,5 @@
 import type { Cluster, DistrictGeometry } from "../../shared/domain";
+import { signalPresentation } from "../../shared/community-review";
 
 type Props = {
   district: { name: string; state: string; lat: number; lon: number };
@@ -105,7 +106,7 @@ export function DistrictMap({
           const [x, y] = project([cluster.lon, cluster.lat]);
           return (
             <g
-              className={`geo-marker ${cluster.status}`}
+              className={`geo-marker ${signalPresentation(cluster).tone}`}
               key={cluster.id}
               transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}
             >

@@ -71,6 +71,8 @@ import { Onboarding } from "./components/Onboarding";
 import { LanguageStatus } from "./components/LanguageStatus";
 import { usePageLanguage } from "./lib/use-page-language";
 import type { CommunityMapPlace } from "../shared/community-map";
+import { COMMUNITY_REVIEW_CONSENT, signalPresentation } from "../shared/community-review";
+import { CommunityGuidance } from "./components/CommunityGuidance";
 const CityMap = lazy(() => import("./components/CityMap"));
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 type Page = "home" | "farmAdvisor" | "advisor" | "records" | "community" | "authority" | "expert" | InfoPageKind;
@@ -128,6 +130,8 @@ export default function App() {
   const [mapPlace, setMapPlace] = useState<CommunityMapPlace>();
   const [mapLoading, setMapLoading] = useState(false);
   const [mapRetry, setMapRetry] = useState(0);
+  const [feedRetry, setFeedRetry] = useState(0);
+  const [feedFailed, setFeedFailed] = useState(false);
   const [liveClusters, setLiveClusters] = useState<
     ReturnType<typeof clusterReports>
   >([]);
@@ -246,15 +250,6 @@ export default function App() {
       });
     if (demo) setReports(demoReports(districtId));
     else {
-      request<{ clusters: ReturnType<typeof clusterReports> }>(
-        `outbreaks/nearby?districtId=${encodeURIComponent(districtId)}`,
-      )
-        .then((value) => {
-          if (!cancelled) setLiveClusters(value.clusters);
-        })
-        .catch((e) => {
-          if (!cancelled) setError(e.message);
-        });
       request<{ geometry: DistrictGeometry }>(
         `districts/boundary?districtId=${encodeURIComponent(districtId)}`,
       )
@@ -269,6 +264,26 @@ export default function App() {
       cancelled = true;
     };
   }, [districtId, entryMode]);
+  useEffect(() => {
+    if (demo || entryMode === "visitor" || !["community", "authority", "advisor"].includes(page)) return;
+    let cancelled = false, inFlight = false;
+    setLiveClusters([]); setFeedFailed(false);
+    const refresh = async () => {
+      if (cancelled || inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
+      try {
+        const value = await request<{ clusters: ReturnType<typeof clusterReports> }>(`outbreaks/nearby?districtId=${encodeURIComponent(districtId)}`);
+        if (!cancelled) { setLiveClusters(value.clusters); setFeedFailed(false); }
+      } catch {
+        if (!cancelled) { setLiveClusters([]); setFeedFailed(true); }
+      } finally { inFlight = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [districtId, entryMode, page, feedRetry]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [current?.messages.length, busy]);
@@ -572,12 +587,14 @@ export default function App() {
             lon: district.lon,
             timestamp: Date.now(),
             origin: "demo",
+            awaitingReview: true,
           },
         ]);
       } else {
         await request("reports/contribute", {
           receipt: consent.receipt,
           consent: true,
+          reviewConsentVersion: COMMUNITY_REVIEW_CONSENT,
           ...(entryMode === "farmer" && activeLocation
             ? { locationSource: "saved_region" }
             : { locationSource: "gps", position: await currentPosition() }),
@@ -630,8 +647,7 @@ export default function App() {
   ) {
     const content = JSON.stringify(
       {
-        notice:
-          "Unverified potential disease signals. Not confirmed outbreaks.",
+        notice: t("communityExportNotice"),
         origin,
         exportedAt: new Date().toISOString(),
         clusters: selectedClusters,
@@ -962,13 +978,13 @@ export default function App() {
               </div>
             </aside>
             <div className="chat">
-              {clusters.some((c) => c.status === "potential") && (
+              {clusters.some((c) => signalPresentation(c).tone === "hazard") && (
                 <button
                   className="nearby-alert"
                   onClick={() => go("community")}
                 >
                   <Radio size={15} />
-                  {t("alert")}
+                  {t("communitySpreading")}
                   <ArrowUpRight size={15} />
                 </button>
               )}
@@ -1173,7 +1189,7 @@ export default function App() {
         ) : page === "records" || page === "farmAdvisor" ? (
           entryMode === "farmer" ? <FarmRecords key={page} copy={copy} locale={locale} onError={setError} view={page === "farmAdvisor" ? "advisory" : "diary"} onAdvisory={() => go("farmAdvisor")} onChat={() => go("advisor")} /> : <section className="section"><h1>{copy.farmAdvisory}</h1><p>{copy.farmerAccessCopy}</p><button className="primary" onClick={() => void enterWithGoogle().catch((e) => setError(e.message))}>{copy.googleAccess}</button></section>
         ) : page === "expert" ? (
-          <ExpertReview copy={copy} onError={setError} />
+          <ExpertReview copy={copy} onError={setError} demoReports={reports} onDemoReview={(id, review) => setReports((current) => current.map((report) => report.id === id ? { ...report, awaitingReview: false, review } : report))} />
         ) : (
           <section className="watch-page section">
             <div className="watch-heading">
@@ -1212,6 +1228,7 @@ export default function App() {
               {locationSelector}
               <div className="watch-controls">
                 <span>{t("window")}</span>
+                {!syntheticWatch && <button className="text-button" onClick={() => setFeedRetry((value) => value + 1)}>{t("communityRefresh")}</button>}
                 {!demo && (
                   <button
                     className="text-button example-toggle"
@@ -1242,14 +1259,15 @@ export default function App() {
                 ariaLabel={`${t("mapLabel")} ${knownDistrict.name}`}
               /> : <div className="community-empty-map" role="status"><MapPin size={36} /><h2>{districtLabel}</h2><p>{mapLoading ? t("cityMapLoading") : demo ? t("noBoundary") : t("cityMapUnavailable")}</p>{!mapLoading && !demo && <button className="secondary" onClick={() => setMapRetry((value) => value + 1)}>{t("cityMapRetry")}</button>}</div>}
               <div className="incident-list">
+                {!syntheticWatch && <p role="status">{t(feedFailed ? "communityFeedFailed" : "communityRefreshNote")}</p>}
                 {!watchClusters.length ? (
-                  <p>{t("noReports")}</p>
+                  !feedFailed && <p>{t("noReports")}</p>
                 ) : (
                   watchClusters.map((cluster) => (
                     <article className="incident" key={cluster.id}>
-                      <span className={`incident-status ${cluster.status}`}>
+                      <span className={`incident-status ${signalPresentation(cluster).tone}`}>
                         <span />
-                        {t(cluster.status)}
+                        {t(signalPresentation(cluster).label)}
                       </span>
                       <h3>{cluster.name}</h3>
                       <p>
@@ -1264,6 +1282,7 @@ export default function App() {
                         <span>{t("reports")}</span>
                       </div>
                       <small>{t("reportNotice")}</small>
+                      <CommunityGuidance reviews={cluster.reviews} copy={copy} />
                       {mapPlace && <button className="text-button" onClick={() => setFocusedSignal(cluster.id)}>{t("viewSignalOnMap")}</button>}
                     </article>
                   ))

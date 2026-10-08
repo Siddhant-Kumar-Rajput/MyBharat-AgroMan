@@ -1,6 +1,16 @@
 # Phase 2 implementation status
 
-## Current release: v1.2.2 — mobile shell and community signals
+## Current release: v1.6.0 — community expert review
+
+Newly consented community contributions create global expert tickets and amber pending-review map signals. Authorized reviewers can publish sourced prevention advice and choose monitoring, risk of spread (red), risk not confirmed, or resolved. The map and cards show the latest public assessment and its date; no farmer identity, PIN/locality, photo or reviewer account identifiers are exposed. Legacy reports remain unreviewed, with no implicit consent migration. Queue location is not restricted by the expert's profile. See `EXPERT_REVIEW_ACCESS.md` for the workflow, active windows, limits and access configuration.
+
+This release retains the v1.3–v1.5 navigation, consent-based planning, page-first translation, compact information controls, landing motion, official market links and individual expert grants documented in `CHANGELOG.md`. It does not add a live market feed, automatic agronomic verification or a guaranteed expert response time. Private crop-cycle cases and the visible-growth tool remain separate from consented public sharing.
+
+Validation: frontend, Functions and Worker builds pass; 102 unit/integration tests pass. The desktop/mobile regression run passed 55 checks with three explicit environment-gated skips; the two outdated consent-label tests were corrected and passed in follow-up checks, covering all 57 applicable checks. Final focused checks also verify the new review lifecycle, expanded popup bounds, Hindi at 320px, consent disclosure and advisory/community navigation. Review-source validation rejects non-HTTPS, malformed and credential-bearing URLs; concurrent updates cannot overwrite a newer assessment. Screenshots were inspected with fixture map tiles (not production tile crawling). The sizeable frontend chunk warning remains; this is not an agronomic or security-readiness certification.
+
+Remote migration `0008_community_review.sql` applied successfully without backfilling old reports. Worker version `c03ecb76-89d0-45e5-87fe-b1ea7578ac52` deployed; health/CORS passed and unauthenticated expert access returned 401. Both legacy and individual expert-grant secret names remain configured. No fabricated public reports or reviews were inserted into production for testing. Real end-user Google sessions and expert agronomic decisions were not automated in this release verification.
+
+## Previous release: v1.2.2 — mobile shell and community signals
 
 Information-page hero styles no longer target the shared navigation header. At the same viewport, the shared header is 72px tall up to 860px and 82px above that. Footer-linked pages use a contents navigation, readable stacked sections and a compact notice while retaining the shared footer. Story grids shrink correctly, use wrapped field values and mobile-sized controls, and reveal fields vertically to avoid transient horizontal overflow.
 

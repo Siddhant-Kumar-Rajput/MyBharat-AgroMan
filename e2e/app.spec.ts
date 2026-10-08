@@ -126,11 +126,12 @@ test("photo consent contributes metadata without persisting photo data", async (
   ).toBeVisible();
   await page
     .getByRole("button", {
-      name: "Contribute anonymous observation",
+      name: "Share an issue for expert review",
       exact: true,
     })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("prevention advice will also be public");
   await page.getByRole("button", { name: "Agree and contribute" }).click();
   await expect(
     page.getByRole("button", { name: "Observation contributed" }),
@@ -200,7 +201,7 @@ test("guest community view exposes only labeled aggregate demo signals", async (
   ).toBeVisible();
   await expect(page.locator(".geo-marker")).toHaveCount(1);
   await expect(
-    page.getByText("Potential outbreak", { exact: true }),
+    page.getByText("Unreviewed observation", { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Authority view" })).toHaveCount(0);
 });

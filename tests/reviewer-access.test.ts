@@ -41,6 +41,7 @@ function setup() {
           bind: (...values: unknown[]) => ({
             sql,
             values,
+            all: async () => ({ results: [] }),
             first: async () =>
               sql.includes("quotas")
                 ? { count: 1 }
