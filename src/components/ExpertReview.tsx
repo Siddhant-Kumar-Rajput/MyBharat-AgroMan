@@ -100,7 +100,7 @@ export function ExpertReview({ copy: t, onError, demoReports = [], onDemoReview 
             monitoring: draft.monitoring.split("\n").map((line) => line.trim()).filter(Boolean),
             nonChemical: draft.nonChemical.split("\n").map((line) => line.trim()).filter(Boolean),
           },
-          sources: [draft.source],
+          sources: [draft.source.trim()].filter(Boolean),
           synthetic: false,
         });
       }
@@ -153,7 +153,7 @@ export function ExpertReview({ copy: t, onError, demoReports = [], onDemoReview 
                 <label>{t.remedySummary}<textarea required value={drafts[item.id]?.summary || ""} onChange={(event) => setDrafts({ ...drafts, [item.id]: { summary: event.target.value, monitoring: drafts[item.id]?.monitoring || "", nonChemical: drafts[item.id]?.nonChemical || "", source: drafts[item.id]?.source || "" } })} /></label>
                 <label>{t.monitoringSteps}<textarea required placeholder={t.onePerLine} value={drafts[item.id]?.monitoring || ""} onChange={(event) => setDrafts({ ...drafts, [item.id]: { summary: drafts[item.id]?.summary || "", monitoring: event.target.value, nonChemical: drafts[item.id]?.nonChemical || "", source: drafts[item.id]?.source || "" } })} /></label>
                 <label>{t.nonChemicalSteps}<textarea required placeholder={t.onePerLine} value={drafts[item.id]?.nonChemical || ""} onChange={(event) => setDrafts({ ...drafts, [item.id]: { summary: drafts[item.id]?.summary || "", monitoring: drafts[item.id]?.monitoring || "", nonChemical: event.target.value, source: drafts[item.id]?.source || "" } })} /></label>
-                <label>{t.authoritativeSource}<input type="url" required placeholder="https://" value={drafts[item.id]?.source || ""} onChange={(event) => setDrafts({ ...drafts, [item.id]: { summary: drafts[item.id]?.summary || "", monitoring: drafts[item.id]?.monitoring || "", nonChemical: drafts[item.id]?.nonChemical || "", source: event.target.value } })} /></label>
+                <label>{t.authoritativeSourceOptional}<input type="url" placeholder="https://" value={drafts[item.id]?.source || ""} onChange={(event) => setDrafts({ ...drafts, [item.id]: { summary: drafts[item.id]?.summary || "", monitoring: drafts[item.id]?.monitoring || "", nonChemical: drafts[item.id]?.nonChemical || "", source: event.target.value } })} /></label>
                 <button className="secondary" disabled={busy}>
                   <CheckCircle2 size={16} /> {t.approveSourcedGuidance}
                 </button>

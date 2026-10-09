@@ -50,7 +50,7 @@ Firebase sign-in credentials and mobile-verification settings are unchanged.
    regions**. The queue is global, capped at 100 recent active issues with pending
    reviews first. A Haldwani expert can review a Noida report and vice versa.
 4. The expert selects monitoring, risk of spread, risk not confirmed, or resolved;
-   writes a public summary and prevention steps; adds an HTTPS source; and confirms
+   writes a public summary and prevention steps; optionally adds an HTTPS source; and confirms
    publication. Only **risk of spread** turns the marker red. Report counts and
    model confidence never do. Changing the assessment updates its marker.
 5. Community Watch shows the assessment, advice, sources and review date in the
@@ -62,7 +62,7 @@ Firebase sign-in credentials and mobile-verification settings are unchanged.
 Public responses omit identity, reviewer-account identifiers, PIN/locality and
 photos. Reviews are attributed internally to the server-authenticated reviewer,
 stored immutably, and protected from stale overwrites by a case version. Experts
-must not put private information into public free text. Sources are required but
+must not put private information into public free text. Sources are optional as of v1.6.1 and
 not automatically verified for agronomic correctness or government endorsement.
 
 Migration `0008_community_review.sql` is additive and does not backfill old reports.

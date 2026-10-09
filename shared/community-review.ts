@@ -24,7 +24,7 @@ export const communityReviewSchema = z
     risk: communityRiskSchema,
     summary: z.string().trim().min(10).max(1000),
     prevention: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
-    sources: z.array(sourceUrl).min(1).max(5),
+    sources: z.array(sourceUrl).max(5).default([]),
     publishConsent: z.literal(true),
   })
   .strict();

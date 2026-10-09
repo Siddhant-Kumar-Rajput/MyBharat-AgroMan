@@ -1,5 +1,11 @@
 # Release history
 
+## v1.6.1 — 9 October 2026
+
+- Make authoritative source links optional in both community and private-case expert review forms and backend validation. Empty or omitted source lists are accepted; supplied links retain validation.
+- Label the field optional in English and Hindi. Leave the layout and navigation unchanged.
+- Per user request, no tests or builds were run; this update is GitHub-only, not a cloud deployment.
+
 ## v1.6.0 — 8 October 2026
 
 - Connect newly consented community issues to a global expert queue, separate from private crop-cycle cases. Preserve older contributions as unreviewed observations; do not infer new consent or backfill expert tickets.

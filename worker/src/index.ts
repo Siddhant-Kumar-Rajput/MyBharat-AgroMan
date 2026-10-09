@@ -1221,7 +1221,7 @@ async function route(request: Request, env: Env) {
         monitoring: z.array(z.string().trim().min(1).max(300)).max(8),
         nonChemical: z.array(z.string().trim().min(1).max(300)).max(8),
       }),
-      sources: z.array(z.string().url()).min(1).max(8),
+      sources: z.array(z.string().url()).max(8).default([]),
       synthetic: z.boolean().default(false),
     }).parse(await body(request));
     const exists = await env.DB.prepare("SELECT id FROM crop_health_cases WHERE id = ?")

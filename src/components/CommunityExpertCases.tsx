@@ -102,7 +102,7 @@ export function CommunityExpertCases({
                         .split("\n")
                         .map((line) => line.trim())
                         .filter(Boolean),
-                      sources: [String(data.get("source"))],
+                      sources: [String(data.get("source") ?? "").trim()].filter(Boolean),
                       publishConsent: data.get("publish") === "on",
                     });
                     if (!parsed.success) {
@@ -168,11 +168,10 @@ export function CommunityExpertCases({
                     />
                   </label>
                   <label>
-                    {t.authoritativeSource}
+                    {t.authoritativeSourceOptional}
                     <input
                       name="source"
                       type="url"
-                      required
                       pattern="https://.*"
                       maxLength={1000}
                       placeholder="https://"

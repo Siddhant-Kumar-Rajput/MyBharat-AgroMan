@@ -1,6 +1,10 @@
 # Phase 2 implementation status
 
-## Current release: v1.6.0 — community expert review
+## Latest repository release: v1.6.1 — optional expert sources
+
+Source URLs are optional in both expert review forms and their API schemas. Blank fields become empty source lists; supplied links retain validation. English/Hindi labels and help text explain the change. No tests, builds or cloud deployment were performed for this patch, at the user's request to make the field optional and push only. The live deployment remains v1.6.0 until this patch is deployed.
+
+## Live release: v1.6.0 — community expert review
 
 Newly consented community contributions create global expert tickets and amber pending-review map signals. Authorized reviewers can publish sourced prevention advice and choose monitoring, risk of spread (red), risk not confirmed, or resolved. The map and cards show the latest public assessment and its date; no farmer identity, PIN/locality, photo or reviewer account identifiers are exposed. Legacy reports remain unreviewed, with no implicit consent migration. Queue location is not restricted by the expert's profile. See `EXPERT_REVIEW_ACCESS.md` for the workflow, active windows, limits and access configuration.
 
