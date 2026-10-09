@@ -4,7 +4,7 @@
 
 - Make authoritative source links optional in both community and private-case expert review forms and backend validation. Empty or omitted source lists are accepted; supplied links retain validation.
 - Label the field optional in English and Hindi. Leave the layout and navigation unchanged.
-- Per user request, no tests or builds were run; this update is GitHub-only, not a cloud deployment.
+- Initially pushed without tests or builds at the user's request. On 9 October 2026, the user approved deployment: the production build passed and the Worker/Firebase Hosting releases completed. No tests were run.
 
 ## v1.6.0 — 8 October 2026
 

@@ -1,10 +1,12 @@
 # Phase 2 implementation status
 
-## Latest repository release: v1.6.1 — optional expert sources
+## Live release: v1.6.1 — optional expert sources
 
-Source URLs are optional in both expert review forms and their API schemas. Blank fields become empty source lists; supplied links retain validation. English/Hindi labels and help text explain the change. No tests, builds or cloud deployment were performed for this patch, at the user's request to make the field optional and push only. The live deployment remains v1.6.0 until this patch is deployed.
+Source URLs are optional in both expert review forms and their API schemas. Blank fields become empty source lists; supplied links retain validation. English/Hindi labels and help text explain the change. Initially pushed without tests or deployment; subsequently built and deployed on 9 October 2026 with the user's approval. No tests or live functional checks were run for this patch, as requested. The build passed with the existing large-chunk warning.
 
-## Live release: v1.6.0 — community expert review
+GitHub release commit: `c31ebcd3e9e4af99b6b88257b471ae834e5207e0` (`v1.6.1`). Cloudflare Worker deployment: `124bd731-fed2-4c53-af7e-f66273d31751`. Firebase Hosting confirmed release completion for `https://mybharat-agroman.web.app`. Deployment completion is not a claim of fresh functional validation. Existing expert grants and application configuration were not deliberately changed.
+
+## Previous release: v1.6.0 — community expert review
 
 Newly consented community contributions create global expert tickets and amber pending-review map signals. Authorized reviewers can publish sourced prevention advice and choose monitoring, risk of spread (red), risk not confirmed, or resolved. The map and cards show the latest public assessment and its date; no farmer identity, PIN/locality, photo or reviewer account identifiers are exposed. Legacy reports remain unreviewed, with no implicit consent migration. Queue location is not restricted by the expert's profile. See `EXPERT_REVIEW_ACCESS.md` for the workflow, active windows, limits and access configuration.
 
