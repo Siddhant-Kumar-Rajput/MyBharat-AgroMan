@@ -1,17 +1,41 @@
-# AgroMan
+# My Bharat Agroman
 
-Phase 2 agricultural record and advisory PWA, extended from the frozen Phase 1 baseline. The frontend uses React and TypeScript, Firebase Anonymous/Phone Authentication and Hosting. Its protected API runs on Cloudflare Workers with D1, Workers AI and Gemini. See [the reconciled Phase 2 plan](docs/PHASE2_PLAN.md) for identity roles, original-spec coverage, delivery order and claim boundaries.
+My Bharat Agroman is a mobile-first farming and advisory application created for the MY Bharat hackathon. It helps farmers keep a simple season record, understand the evidence available for their field, ask for practical guidance and share crop concerns for community visibility and authorized human review.
+
+The application is a working prototype. Its demonstration data is synthetic, and it is not a government-operated service.
+
+**Try the web application:** [mybharat-agroman.web.app](https://mybharat-agroman.web.app/)
+
+## What farmers can do
+
+- Explore as a guest or sign in with Google to save a profile and farm records. Phone verification is optional.
+- Choose a language at entry or from the shared navigation. English and Hindi are bundled; other listed Indian languages use on-demand translation and depend on provider availability. Translation quality is not certified.
+- Set up a basic field profile with area, water availability and the current crop or previous harvest.
+- Use **My Farm Advisor** to review crop age, harvest history, approximate weather and the crop-calendar evidence available for a region. The advisor computes useful summaries and can request a consent-based AI planning check.
+- Ask **My Bharat Agroman** questions by text or voice. Voice transcription uses Whisper through Cloudflare Workers AI; the transcript can be edited before sending. Read-aloud depends on the device voice and configured speech services.
+- Use **Check Visible Growth** to request a consent-based description of a resized crop photo. The application saves the derived observation rather than the photo.
+- Keep season activities, inputs and harvests in **My Farm Diary**. Optional finance records total the income and expenses entered by the farmer.
+- Open official market and export-information links through **My Opportunities** to research possible selling routes.
+- View approximate, consented concerns on the **Community Watch** city map. Authorized reviewers can assess concerns, publish prevention guidance, flag possible spread risk or mark an assessment resolved.
+
+## How the advisory works
+
+The application reuses a small amount of farmer-provided information and performs calculations such as area conversion, crop age, time since harvest and summaries of recorded income and expenses. It uses approximate, model-estimate weather and selected sourced crop calendars where available. Missing soil evidence remains visible; the application does not infer a soil laboratory result or fertilizer dose from a PIN code.
+
+Google Gemini supports agricultural chat, consent-based planning and visible-growth photo observations. AI output is decision support and does not establish a definitive diagnosis or guarantee yield or profit. Community risk and resolution labels come from an authorized human review. Reviewer access is explicitly granted by the project owner; a Google login alone does not grant it.
 
 ## Run locally
 
-Use Node 22 LTS, then:
+Install the project dependencies and start the web application:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The default is **clearly labeled demonstration mode**. No credentials are needed. Responses and outbreak seeds are synthetic, and images are not analyzed in this mode.
+Open the local address shown by Vite. Local development uses clearly labelled synthetic demonstration data unless live mode is explicitly configured. No production credentials should be added to source control.
+
+Useful project checks:
 
 ```sh
 npm run check
@@ -19,54 +43,21 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-For the live API, create ignored `worker/.dev.vars` from `worker/.dev.vars.example`, apply the local D1 migrations, and run the Worker in a second terminal:
+For Firebase and Cloudflare Worker configuration, see [docs/SETUP.md](docs/SETUP.md). To understand reviewer access and the review workflow, see [docs/EXPERT_REVIEW_ACCESS.md](docs/EXPERT_REVIEW_ACCESS.md). Keep local values in ignored environment files such as `worker/.dev.vars`; never commit API keys, tokens, phone numbers or other secrets.
 
-```sh
-npm run db:local -w worker
-npm run dev -w worker
-```
+## Current boundaries
 
-## Current capability
+- Weather is an approximate model estimate for a saved place, not a measurement from the farmer's field or an official severe-weather warning.
+- Crop-calendar coverage is limited to selected sourced regions. A nationwide location directory does not mean nationwide crop recommendations are available.
+- There is no connected field soil-report service, fertilizer-dose estimator, live buyer-matching system or export-demand feed.
+- My Finances summarizes entries the farmer has recorded; it is not an audited profit statement or earnings forecast.
+- Community review is an application workflow. It does not guarantee expert availability, a response time or professional qualification verification.
+- The prototype has not been validated through a farmer pilot or an independent agronomic evaluation.
 
-- Responsive welcome, advisor, community and authority screens; reduced-motion support.
-- Three conversations saved locally in IndexedDB; eighteen questions per thread.
-- Text/image chat flow, JPEG compression and metadata-only opt-in reporting.
-- Distinct-installation outbreak clustering with confidence, time, district and distance checks.
-- JSON authority summaries with explicit synthetic/live provenance.
-- Protected Worker routes for Gemini, speech recognition, translation, D1 context and reports.
-- Firebase anonymous ID-token verification, optional App Check, quotas and diagnosis receipts.
-- Browser-native speech first, Sarvam Bulbul v3 neural speech for ten Indian
-  languages plus English, and an on-device eSpeak fallback.
-- PWA shell and cached local conversations; new advice needs network access.
-- Phase 2 domain and D1 schemas for phone-verified profiles, multiple plots,
-  crop cycles, activities, ledger entries, derived crop-health cases, outcomes,
-  exports and reviewer decisions.
-- Local farmer-record UI with JSON/CSV/print exports and labelled synthetic case
-  retrieval/reviewer demonstrations.
+## Technology
 
-## Activation requirements and known limits
-
-Read [docs/SETUP.md](docs/SETUP.md) for the completed activation record and remaining release hardening.
-
-The isolated Phase 2 staging path is deployed at `https://mybharat-agroman.web.app` with API `https://mybharat-agroman-api.agroman.workers.dev`. Anonymous guest authentication and service health are verified. Phone OTP reached the Firebase reCAPTCHA flow but still requires lifecycle/network repair before it can be called validated. The new D1 database is migrated but does not yet contain the reviewed district context and boundary imports from Phase 1.
-
-The pilot registry currently contains **six districts**: Ludhiana, Amritsar, Lucknow, Varanasi, Pune and Nashik. This is representative coverage of three states, not full-state coverage. Expanding the registry and verifying district boundary aliases remains data work.
-
-All 22 scheduled Indian languages plus English are selectable. Live UI translation uses the Cloudflare AI4Bharat IndicTrans2 model where supported; English remains the honest fallback. Fonts, translated names, errors and linguistic accuracy must be reviewed by speakers before claiming full support. Speech input uses Whisper. Speech output prefers a device voice, then Sarvam Bulbul v3 for Hindi, Bengali, Tamil, Telugu, Gujarati, Kannada, Malayalam, Marathi, Punjabi and Odia, with eSpeak as the offline/quota fallback. Other languages still depend on a compatible device or eSpeak voice and must not be described as neural coverage.
-
-Community Watch plots aggregate signals by centroid inside a reviewed district boundary. The boundary is contextual rather than a turn-by-turn navigation map, and the optional example preview is visibly labelled synthetic. Raw reports and installation identifiers are never returned to the browser in live mode. Confidence is an uncalibrated AI score, not diagnostic certainty; outbreak clusters are unverified signals.
-
-No current-weather integration, curated crop evidence library, NDVI dashboard,
-Agmarknet nudge, export-demand pipeline or live camera stream is included yet.
-Google sign-in and the new visitor/guest/farmer landing flow are planned but not
-implemented. Persistent record APIs require a phone-verified Firebase token.
-
-## Repository layout
-
-`src/` frontend; `shared/` validation and outbreak rules; `worker/` active protected API and D1 schema; `scripts/` explicit Earth Engine export; `tests/` domain checks; `e2e/` browser tests. `functions/` is retained legacy code and is not part of the Firebase deployment configuration.
-
-The user-requested `gpt-tasteskill` guided the visual treatment. Operational screens keep farmer usability, clear hierarchy and reduced-motion accessibility ahead of decoration.
-
-## Git workflow
-
-Work on `codex/*` branches. Commit coherent tested increments, push branches for backup and review, then merge a pull request into `main`. Do not put secrets or generated build output in Git. Deployment is separate from source commits.
+- **Web application:** React, TypeScript and Vite
+- **Authentication:** Firebase Authentication
+- **Application API and records:** Cloudflare Workers and D1
+- **AI services:** Google Gemini for agricultural guidance and photo observations; Cloudflare Workers AI for speech transcription and interface translation
+- **Weather and maps:** Open-Meteo estimates and OpenStreetMap tiles
