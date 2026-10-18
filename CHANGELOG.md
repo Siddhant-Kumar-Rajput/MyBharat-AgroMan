@@ -1,5 +1,10 @@
 # Release history
 
+## v1.6.2 - 18 October 2026
+
+- Reframe the repository README as the single My Bharat Agroman application created for the MY Bharat hackathon.
+- Document the current farmer features, technology, local setup and product boundaries; remove outdated Phase 1 / Phase 2 framing and obsolete capability status.
+
 ## v1.6.1 — 9 October 2026
 
 - Make authoritative source links optional in both community and private-case expert review forms and backend validation. Empty or omitted source lists are accepted; supplied links retain validation.
